@@ -1,32 +1,75 @@
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import uuid4
 
+import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
+from app.api.chat import router as chat_router
 from app.api.courses import router as courses_router
+from app.api.documents import router as documents_router
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.db.session import make_database
+from app.llm.compatible_provider import CompatibleLLM
+from app.rag.embedding import APIEmbedding, DemoEmbedding
+from app.rag.retriever import Retriever
+from app.rag.vector_store import VectorStore
+from app.services.ingestion import IngestionService
+from app.services.qa import QAService
 
 logger = logging.getLogger("studyagent")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         engine, sessions = make_database(settings.data_dir)
         app.state.sessions = sessions
-        yield
-        engine.dispose()
+        with httpx.Client(timeout=settings.request_timeout, follow_redirects=False) as client:
+            app.state.http = client
+            embeddings = (
+                DemoEmbedding(settings)
+                if settings.study_mode == "demo"
+                else APIEmbedding(settings, client)
+            )
+            vectors = VectorStore(settings, embeddings.fingerprint)
+            app.state.embeddings, app.state.vectors = embeddings, vectors
+            app.state.ingestion = IngestionService(settings, sessions, embeddings, vectors)
+            app.state.ingestion.recover_interrupted()
+            app.state.ingestion.mark_stale()
+            app.state.retriever = Retriever(settings, sessions, embeddings, vectors)
+            app.state.qa = QAService(settings, app.state.retriever, CompatibleLLM(settings, client))
+            try:
+                yield
+            finally:
+                vectors.client.close()
+                engine.dispose()
 
     app = FastAPI(title="StudyAgent", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.include_router(courses_router)
+    app.include_router(documents_router)
+    app.include_router(chat_router)
+    static = Path(__file__).parent / "static"
+    app.mount("/static", StaticFiles(directory=static), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def home():
+        return FileResponse(static / "index.html")
 
     @app.middleware("http")
     async def request_log(request: Request, call_next):
@@ -63,6 +106,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={
                 "code": exc.code,
                 "message": exc.message,
+                "request_id": request.state.request_id,
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "validation_error",
+                "message": "输入参数不合法，请检查必填项、长度和资料类别",
+                "fields": [".".join(str(part) for part in error["loc"]) for error in exc.errors()],
                 "request_id": request.state.request_id,
             },
         )

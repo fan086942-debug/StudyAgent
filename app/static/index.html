@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StudyAgent · 课程复习工作台</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="/">S<span>StudyAgent<small>把资料变成有据可查的理解</small></span></a><span id="mode" class="badge">正在连接…</span></header>
+  <main>
+    <aside>
+      <div class="eyebrow">你的学习空间</div><h2>课程资料库</h2>
+      <label for="course">当前课程</label><select id="course"><option value="">请先创建课程</option></select>
+      <form id="course-form" class="inline"><label class="sr-only" for="course-name">新课程名称</label><input id="course-name" placeholder="输入新课程名称" maxlength="120" required><button type="submit" class="secondary">创建</button></form>
+      <hr>
+      <form id="upload-form">
+        <label for="document-type">资料类别</label>
+        <select id="document-type"><option value="textbook">教材</option><option value="slides">课件</option><option value="notes">复习笔记 / 教师重点</option><option value="exam">试卷（按普通资料检索）</option><option value="other">其他</option></select>
+        <label class="upload-box" for="files"><strong>添加课程资料</strong><span>PDF · PPTX · DOCX</span><input id="files" type="file" accept=".pdf,.pptx,.docx" multiple required></label>
+        <button id="upload-button" type="submit" class="full">上传并建立索引</button>
+        <p class="hint">文本型 PDF，单文件默认上限 25 MB。扫描件需要 OCR，旧版 PPT / DOC 请先转换。</p>
+      </form>
+      <div class="list-heading"><h3>资料列表</h3><button id="refresh" type="button" class="link-button">刷新</button></div>
+      <p class="hint">勾选资料限定检索范围；不勾选时检索当前课程全部可用资料。</p>
+      <div id="documents" class="document-list"><p class="empty">创建课程后开始上传。</p></div>
+    </aside>
+    <section class="workspace">
+      <div class="eyebrow">PHASE 01 / 有来源的资料问答</div>
+      <h1>复习，从一个好问题开始。</h1>
+      <p class="intro">在教材、课件和笔记之间找到线索，让每一次回答都有原文可查。</p>
+      <div id="mode-note" class="notice">正在读取服务模式…</div>
+      <form id="question-form" class="question-card">
+        <label for="question">你想了解什么？</label>
+        <textarea id="question" maxlength="2000" rows="4" placeholder="例如：A* 算法的评价函数是什么？资料在哪里讲到？" required></textarea>
+        <div class="question-actions"><span class="hint">仅使用当前课程及所选资料</span><button id="ask-button" type="submit">检索并回答 ↗</button></div>
+      </form>
+      <div id="status" role="status" aria-live="polite"></div>
+      <section id="result" hidden>
+        <div class="result-heading"><h2>回答与依据</h2><span id="timing" class="hint"></span></div>
+        <div id="answer" class="answer"></div><p id="warning" class="warning"></p>
+        <h3>引用来源</h3><div id="sources" class="sources"></div>
+      </section>
+      <div id="welcome" class="welcome"><span class="step">01 上传资料</span><span class="step">02 提出问题</span><span class="step">03 对照原文</span><p>来源位置直接读取文件元数据。PDF 使用物理页码，Word 使用标题与段落位置。</p></div>
+      <footer>StudyAgent · Phase 1 RAG 基础 <a href="/docs" target="_blank" rel="noopener">API 文档 ↗</a></footer>
+    </section>
+  </main>
+</body>
+</html>

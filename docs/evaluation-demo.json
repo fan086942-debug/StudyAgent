@@ -1,0 +1,663 @@
+{
+  "timestamp_utc": "2026-09-15T09:07:23.118482+00:00",
+  "mode": "demo",
+  "dataset": "自编三格式合成资料；文档级标注；不代表真实课程效果",
+  "qa_status": "未执行真实 LLM QA",
+  "document_count": 3,
+  "chunk_count": 14,
+  "configuration": {
+    "chunk_size": 800,
+    "overlap": 120,
+    "top_k": 6,
+    "threshold": 0.25
+  },
+  "all": {
+    "queries": 24,
+    "answerable_queries": 20,
+    "document_recall_at_k": 0.425,
+    "document_hit_rate_at_k": 0.5,
+    "document_mrr": 0.45,
+    "retrieval_ms_mean": 2.5540583332788933,
+    "total_ms_mean": 2.637829166701522,
+    "error_rate": 0.0
+  },
+  "dev": {
+    "queries": 8,
+    "answerable_queries": 8,
+    "document_recall_at_k": 0.3125,
+    "document_hit_rate_at_k": 0.5,
+    "document_mrr": 0.4375,
+    "retrieval_ms_mean": 2.85261249996438,
+    "total_ms_mean": 2.942099999813763,
+    "error_rate": 0.0
+  },
+  "test": {
+    "queries": 16,
+    "answerable_queries": 12,
+    "document_recall_at_k": 0.5,
+    "document_hit_rate_at_k": 0.5,
+    "document_mrr": 0.4583333333333333,
+    "retrieval_ms_mean": 2.40478124993615,
+    "total_ms_mean": 2.4856937501454013,
+    "error_rate": 0.0
+  },
+  "results": [
+    {
+      "id": "q01",
+      "split": "dev",
+      "question": "A* 算法的评价函数是什么？",
+      "expected_sources": [
+        "人工智能教材.pdf",
+        "搜索算法课件.pptx"
+      ],
+      "retrieved_sources": [
+        "搜索算法课件.pptx"
+      ],
+      "recall_at_k": 0.5,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 5.740900000091642,
+      "retrieval_ms": 3.107300000010582,
+      "total_ms": 3.1951000000844942,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] A* 算法与启发式函数\nA* 的评价函数是 f(n)=g(n)+h(n)。一致性要求 h(n) 不超过边代价与后继启发值之和。\n备注：课堂提醒：区分实际路径代价与估计剩余代价。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "g(n)",
+        "h(n)"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q02",
+      "split": "dev",
+      "question": "A* 的 g(n) 表示什么？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [
+        "人工智能教材.pdf",
+        "搜索算法课件.pptx",
+        "教师复习重点.docx"
+      ],
+      "recall_at_k": 1.0,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 3.249199999117991,
+      "retrieval_ms": 4.216600000290782,
+      "total_ms": 4.295199999432953,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 第1章 启发式搜索\nA* 算法通过 f(n)=g(n)+h(n) 选择结点。g(n) 是从\n起点到当前结点的实际代价，h(n) 是到目标的估计代价。可采纳启发式不\n高估到目标的最小代价。\n\n[S2] A* 算法与启发式函数\nA* 的评价函数是 f(n)=g(n)+h(n)。一致性要求 h(n) 不超过边代价与后继启发值之和。\n备注：课堂提醒：区分实际路径代价与估计剩余代价。\n\n[S3] A* 算法复习建议：手工计算 g(n)、h(n) 和 f(n)，说明可采纳启发式的意义。BFS 和 DFS 应掌握队列与栈的区别。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "实际代价"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q03",
+      "split": "dev",
+      "question": "可采纳启发式是什么？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [
+        "教师复习重点.docx"
+      ],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 3.090199999860488,
+      "retrieval_ms": 3.0487000003631692,
+      "total_ms": 3.165499999340682,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] A* 算法复习建议：手工计算 g(n)、h(n) 和 f(n)，说明可采纳启发式的意义。BFS 和 DFS 应掌握队列与栈的区别。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "不高估"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q04",
+      "split": "dev",
+      "question": "BFS 广度优先搜索用什么数据结构？",
+      "expected_sources": [
+        "人工智能教材.pdf",
+        "搜索算法课件.pptx"
+      ],
+      "retrieved_sources": [
+        "教师复习重点.docx",
+        "人工智能教材.pdf"
+      ],
+      "recall_at_k": 0.5,
+      "hit_at_k": 1,
+      "reciprocal_rank": 0.5,
+      "search_retrieval_ms": 3.1648000003769994,
+      "retrieval_ms": 3.784999999879801,
+      "total_ms": 3.909899999598565,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 算法 | 数据结构\nBFS | 队列\n\n[S2] 第2章 无信息搜索\nBFS 广度优先搜索使用队列，按照层次扩展结点。在每条边代价相同的情况\n下可以找到最短路径。DFS 深度优先搜索使用栈或递归，优先沿一个分支深\n入，不保证最短路径。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "队列"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q05",
+      "split": "dev",
+      "question": "DFS 深度优先搜索如何扩展？",
+      "expected_sources": [
+        "人工智能教材.pdf",
+        "搜索算法课件.pptx"
+      ],
+      "retrieved_sources": [
+        "人工智能教材.pdf"
+      ],
+      "recall_at_k": 0.5,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 3.084100000705803,
+      "retrieval_ms": 2.726099999563303,
+      "total_ms": 2.8055000002495944,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 第2章 无信息搜索\nBFS 广度优先搜索使用队列，按照层次扩展结点。在每条边代价相同的情况\n下可以找到最短路径。DFS 深度优先搜索使用栈或递归，优先沿一个分支深\n入，不保证最短路径。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "分支"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q06",
+      "split": "dev",
+      "question": "贝叶斯公式是什么？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 2.209700000094017,
+      "retrieval_ms": 1.9259999999121646,
+      "total_ms": 2.0089999998162966,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "P(A|B)"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q07",
+      "split": "dev",
+      "question": "过拟合表现是什么？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 1.8968000003951602,
+      "retrieval_ms": 2.0107000000280095,
+      "total_ms": 2.0831000001635402,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "训练误差",
+        "测试误差"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q08",
+      "split": "dev",
+      "question": "Alpha-Beta 剪枝有什么作用？",
+      "expected_sources": [
+        "搜索算法课件.pptx"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 2.235300000393181,
+      "retrieval_ms": 2.000499999667227,
+      "total_ms": 2.07349999982398,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "减少"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q09",
+      "split": "test",
+      "question": "教材哪里介绍 A* 算法？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 2.088700000058452,
+      "retrieval_ms": 2.3302999998122687,
+      "total_ms": 2.408399999694666,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "A*"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q10",
+      "split": "test",
+      "question": "PPT 哪里讲 A* 启发式函数？",
+      "expected_sources": [
+        "搜索算法课件.pptx"
+      ],
+      "retrieved_sources": [
+        "搜索算法课件.pptx"
+      ],
+      "recall_at_k": 1.0,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 2.396299999418261,
+      "retrieval_ms": 2.308199999788485,
+      "total_ms": 2.382200000283774,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] A* 算法与启发式函数\nA* 的评价函数是 f(n)=g(n)+h(n)。一致性要求 h(n) 不超过边代价与后继启发值之和。\n备注：课堂提醒：区分实际路径代价与估计剩余代价。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "一致性"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q11",
+      "split": "test",
+      "question": "老师对 A* 的复习建议是什么？",
+      "expected_sources": [
+        "教师复习重点.docx"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 1.7649000001256354,
+      "retrieval_ms": 2.368200000091747,
+      "total_ms": 2.4648000007800874,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "手工计算"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q12",
+      "split": "test",
+      "question": "结合教材与 PPT 解释 BFS 的队列。",
+      "expected_sources": [
+        "人工智能教材.pdf",
+        "搜索算法课件.pptx"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 2.224200000455312,
+      "retrieval_ms": 2.306299999872863,
+      "total_ms": 2.3999000004550908,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "队列"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q13",
+      "split": "test",
+      "question": "DFS 能保证最短路径吗？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [
+        "人工智能教材.pdf"
+      ],
+      "recall_at_k": 1.0,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 2.7903000000151224,
+      "retrieval_ms": 2.8498000001491164,
+      "total_ms": 2.919800000199757,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 第2章 无信息搜索\nBFS 广度优先搜索使用队列，按照层次扩展结点。在每条边代价相同的情况\n下可以找到最短路径。DFS 深度优先搜索使用栈或递归，优先沿一个分支深\n入，不保证最短路径。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "不保证"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q14",
+      "split": "test",
+      "question": "BFS 在什么条件下找到最短路径？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [
+        "人工智能教材.pdf"
+      ],
+      "recall_at_k": 1.0,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 2.7632000001176493,
+      "retrieval_ms": 3.086300000177289,
+      "total_ms": 3.1900000003588502,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 第2章 无信息搜索\nBFS 广度优先搜索使用队列，按照层次扩展结点。在每条边代价相同的情况\n下可以找到最短路径。DFS 深度优先搜索使用栈或递归，优先沿一个分支深\n入，不保证最短路径。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "代价相同"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q15",
+      "split": "test",
+      "question": "贝叶斯先验概率和后验概率怎么区分？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [
+        "教师复习重点.docx",
+        "人工智能教材.pdf"
+      ],
+      "recall_at_k": 1.0,
+      "hit_at_k": 1,
+      "reciprocal_rank": 0.5,
+      "search_retrieval_ms": 3.3810000004450558,
+      "retrieval_ms": 3.811399999904097,
+      "total_ms": 3.9096999998946558,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 贝叶斯公式练习应先写出先验概率与似然，再计算后验概率，避免混淆 P(A|B) 和 P(B|A)。\n\n[S2] 第3章 概率推理\n贝叶斯公式 P(A|B)=P(B|A)P(A)/P(B)。先验概率在观\n察证据之前给出，后验概率根据证据更新。条件独立是朴素贝叶斯的关键假设。\n\n[S3] 重点二：概率",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "证据"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q16",
+      "split": "test",
+      "question": "朴素贝叶斯有什么假设？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 2.067999999781023,
+      "retrieval_ms": 1.9871999993483769,
+      "total_ms": 2.057099999547063,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "条件独立"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q17",
+      "split": "test",
+      "question": "正则化如何缓解过拟合？",
+      "expected_sources": [
+        "人工智能教材.pdf"
+      ],
+      "retrieved_sources": [
+        "人工智能教材.pdf"
+      ],
+      "recall_at_k": 1.0,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 2.481399999851419,
+      "retrieval_ms": 2.448700000059034,
+      "total_ms": 2.535900000111724,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 第4章 机器学习\n过拟合表现为训练误差很低、测试误差较高。正则化通过约束模型复杂度缓解过\n拟合。交叉验证用于评估模型泛化能力和选择超参数。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "复杂度"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q18",
+      "split": "test",
+      "question": "交叉验证用来做什么？",
+      "expected_sources": [
+        "人工智能教材.pdf",
+        "教师复习重点.docx"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 2.152899999600777,
+      "retrieval_ms": 2.3565000001326553,
+      "total_ms": 2.435200000036275,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "模型"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q19",
+      "split": "test",
+      "question": "极小极大搜索适用于什么博弈？",
+      "expected_sources": [
+        "搜索算法课件.pptx"
+      ],
+      "retrieved_sources": [
+        "搜索算法课件.pptx"
+      ],
+      "recall_at_k": 1.0,
+      "hit_at_k": 1,
+      "reciprocal_rank": 1.0,
+      "search_retrieval_ms": 2.618100000290724,
+      "retrieval_ms": 2.329699999791046,
+      "total_ms": 2.4088999998639338,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n[S1] 极小极大搜索\nMinimax 极小极大搜索用于双人零和博弈。Alpha-Beta 剪枝可以减少搜索结点，在相同深度下不改变极小极大结果。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "零和"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q20",
+      "split": "test",
+      "question": "老师提醒贝叶斯公式有什么易错点？",
+      "expected_sources": [
+        "教师复习重点.docx"
+      ],
+      "retrieved_sources": [],
+      "recall_at_k": 0.0,
+      "hit_at_k": 0,
+      "reciprocal_rank": 0,
+      "search_retrieval_ms": 2.016100000219012,
+      "retrieval_ms": 2.0641999999497784,
+      "total_ms": 2.132300000084797,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [
+        "混淆"
+      ],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q21",
+      "split": "test",
+      "question": "量子纠缠的实验装置怎么搭建？",
+      "expected_sources": [],
+      "retrieved_sources": [],
+      "recall_at_k": null,
+      "hit_at_k": null,
+      "reciprocal_rank": null,
+      "search_retrieval_ms": 1.904800000374962,
+      "retrieval_ms": 2.231700000265846,
+      "total_ms": 2.314400000614114,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q22",
+      "split": "test",
+      "question": "莎士比亚十四行诗创作于哪一年？",
+      "expected_sources": [],
+      "retrieved_sources": [],
+      "recall_at_k": null,
+      "hit_at_k": null,
+      "reciprocal_rank": null,
+      "search_retrieval_ms": 2.1123999995324994,
+      "retrieval_ms": 2.0777999998244923,
+      "total_ms": 2.1464000001287786,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q23",
+      "split": "test",
+      "question": "这份资料给出了 2025 期末考试第12题吗？",
+      "expected_sources": [],
+      "retrieved_sources": [],
+      "recall_at_k": null,
+      "hit_at_k": null,
+      "reciprocal_rank": null,
+      "search_retrieval_ms": 1.8681999999898835,
+      "retrieval_ms": 1.8720999996730825,
+      "total_ms": 1.9423000003371271,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [],
+      "human_correctness": null,
+      "human_citation_support": null
+    },
+    {
+      "id": "q24",
+      "split": "test",
+      "question": "教材是否提供了 A* 的时间复杂度公式？",
+      "expected_sources": [],
+      "retrieved_sources": [],
+      "recall_at_k": null,
+      "hit_at_k": null,
+      "reciprocal_rank": null,
+      "search_retrieval_ms": 2.1515999997063773,
+      "retrieval_ms": 2.04810000013822,
+      "total_ms": 2.123799999935727,
+      "llm_ms": 0.0,
+      "usage": null,
+      "error": false,
+      "answer": "当前资料中未找到可靠来源。",
+      "qa_insufficient_evidence": null,
+      "expected_keywords": [],
+      "human_correctness": null,
+      "human_citation_support": null
+    }
+  ]
+}

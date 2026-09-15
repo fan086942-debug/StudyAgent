@@ -5,7 +5,7 @@ import pytest
 
 from app.core.config import Settings
 from app.core.errors import AppError
-from app.llm.compatible_provider import CompatibleLLM
+from app.llm.compatible_provider import CompatibleLLM, post_json
 from app.rag.embedding import APIEmbedding, DemoEmbedding
 
 
@@ -63,3 +63,18 @@ def test_llm_bad_json():
     ) as client:
         with pytest.raises(AppError, match="回答结构"):
             CompatibleLLM(Settings(_env_file=None), client).generate("a", [])
+
+
+def test_transient_retry_bounded_and_errors_redacted():
+    calls = []
+
+    def server(request):
+        calls.append(1)
+        return httpx.Response(503, text="sensitive upstream content")
+
+    with httpx.Client(transport=httpx.MockTransport(server)) as client:
+        with pytest.raises(AppError) as error:
+            post_json(client, "https://example.invalid/test", "test-secret", {})
+        assert len(calls) == 2
+        assert "sensitive" not in error.value.message
+        assert "test-secret" not in error.value.message

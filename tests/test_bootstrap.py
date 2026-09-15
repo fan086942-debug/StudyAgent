@@ -11,6 +11,8 @@ def test_health(tmp_path):
         response = client.get("/health")
         assert response.json()["status"] == "ok"
         assert response.headers["x-request-id"]
+        assert client.get("/").status_code == 200
+        assert client.get("/static/app.js").status_code == 200
 
 
 def test_invalid_config():
