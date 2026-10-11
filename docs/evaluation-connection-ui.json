@@ -1,0 +1,16 @@
+{
+  "simulated_provider": true,
+  "connection_test": true,
+  "api_agent_tool_call": true,
+  "reload_persistence": true,
+  "secret_not_in_browser_storage": true,
+  "cleared_key": true,
+  "demo_switch": true,
+  "widths": [
+    320,
+    390,
+    768,
+    1440
+  ],
+  "javascript_errors": []
+}

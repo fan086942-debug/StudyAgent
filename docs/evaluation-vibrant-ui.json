@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-10",
+  "palette_theme_persistence": true,
+  "palette_dismiss": true,
+  "pointer_and_prompt": true,
+  "navigation_and_shortcuts": true,
+  "responsive": [
+    {
+      "viewport": 320,
+      "content": 320
+    },
+    {
+      "viewport": 390,
+      "content": 390
+    },
+    {
+      "viewport": 768,
+      "content": 768
+    },
+    {
+      "viewport": 1024,
+      "content": 1024
+    },
+    {
+      "viewport": 1440,
+      "content": 1440
+    }
+  ],
+  "scroll_controls": true,
+  "reduced_motion": true,
+  "javascript_errors": [],
+  "api_writes": 0
+}

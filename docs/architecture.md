@@ -1,5 +1,7 @@
 # Phase 1 架构
 
+本文保留 RAG 基础设计。试卷模型、Tool Calling 与 Agent Loop 见 [Phase 2 架构与讲解](phase2.md)。生成服务、历史快照和导出见 [Phase 3 设计](phase3.md)。练习快照、错题、计划、对话历史与新版界面见 [Phase 4 设计](phase4.md)。
+
 ## 范围
 
 单机、单用户、一个 Uvicorn worker。SQLite 是权威资料与来源存储，Chroma 是可重建索引。本阶段不引入任务队列、Agent 框架或知识图谱。

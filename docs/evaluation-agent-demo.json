@@ -1,0 +1,227 @@
+{
+  "created_at": "2026-09-21T08:58:17.645139+00:00",
+  "mode": "demo",
+  "note": "12条自编小样本；demo是确定性规则路由，不代表LLM Tool Selection Accuracy。API模式需另行实测并人工审核答案。",
+  "cases": 12,
+  "documents": 6,
+  "papers": 3,
+  "questions": 13,
+  "first_tool_accuracy": 1.0,
+  "average_total_ms": 7.142991666682974,
+  "stopped_or_failed_rate": 0.0,
+  "results": [
+    {
+      "question": "A* 是什么？",
+      "expected_tool": "search_knowledge",
+      "actual_chain": [
+        "search_knowledge"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 6.007899999985966,
+      "usage": {},
+      "source_count": 0,
+      "question_count": 0,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n当前范围内没有检索到结果。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "解释一下 BFS",
+      "expected_tool": "search_knowledge",
+      "actual_chain": [
+        "search_knowledge"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 6.0441000000537315,
+      "usage": {},
+      "source_count": 2,
+      "question_count": 0,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n[S1] 算法 | 数据结构\nBFS | 队列\n\n[S2] BFS 与 DFS\nBFS：先进先出队列，逐层扩展。DFS：后进先出栈，沿分支深入。比较时要说明边代价是否相同。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "DFS 使用什么数据结构？",
+      "expected_tool": "search_knowledge",
+      "actual_chain": [
+        "search_knowledge"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 4.758800000217889,
+      "usage": {},
+      "source_count": 1,
+      "question_count": 0,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n[S1] 算法 | 数据结构\nBFS | 队列",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "教材哪里讲了 A*？",
+      "expected_tool": "locate_source",
+      "actual_chain": [
+        "locate_source"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 4.227500000069995,
+      "usage": {},
+      "source_count": 0,
+      "question_count": 0,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n当前范围内没有检索到结果。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "定位 BFS",
+      "expected_tool": "locate_source",
+      "actual_chain": [
+        "locate_source"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 5.749700000251323,
+      "usage": {},
+      "source_count": 2,
+      "question_count": 0,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n[S1] 算法 | 数据结构\nBFS | 队列\n\n[S2] BFS 与 DFS\nBFS：先进先出队列，逐层扩展。DFS：后进先出栈，沿分支深入。比较时要说明边代价是否相同。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "A* 在哪里？",
+      "expected_tool": "locate_source",
+      "actual_chain": [
+        "locate_source"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 4.95199999977558,
+      "usage": {},
+      "source_count": 0,
+      "question_count": 0,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n当前范围内没有检索到结果。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "A* 以前怎么考过？",
+      "expected_tool": "search_questions",
+      "actual_chain": [
+        "search_questions"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 6.814200000007986,
+      "usage": {},
+      "source_count": 7,
+      "question_count": 7,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n2023课堂练习.pptx · 第 12 题\n12. 解释 A* 的评价函数。【知识点：A*】\n\n2024期末练习卷.pdf · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n2024期末练习卷.pdf · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识\n点：A*、启发式函数】\n\n2024期末练习卷.pdf · 第 13 题\n13. 若 g(n)=3、h(n)=5，计算 A* 的 f(n)。（4\n分）【知识点：A*】\n\n2025期末练习卷.docx · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n2025期末练习卷.docx · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识点：A*、启发式函数】\n\n2025期末练习卷.docx · 第 13 题\n13. 若 g(n)=3、h(n)=5，计算 A* 的 f(n)。（4分）【知识点：A*】\n\n匹配到多道题，可在题库中选择具体题目进行分析。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "BFS 相关题目",
+      "expected_tool": "search_questions",
+      "actual_chain": [
+        "search_questions"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 3.564900000128546,
+      "usage": {},
+      "source_count": 4,
+      "question_count": 4,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n2024期末练习卷.pdf · 第 2 题\n2. BFS 通常使用队列保存待访问节点。（2分）【知识点：BFS】\n\n2024期末练习卷.pdf · 第 14 题\n14. 比较 BFS 与 DFS 使用的数据结构。（8分）【知识点：B\nFS、DFS】\n\n2025期末练习卷.docx · 第 2 题\n2. BFS 通常使用队列保存待访问节点。（2分）【知识点：BFS】\n\n2025期末练习卷.docx · 第 14 题\n14. 比较 BFS 与 DFS 使用的数据结构。（8分）【知识点：BFS、DFS】\n\n匹配到多道题，可在题库中选择具体题目进行分析。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "DFS 历年试题",
+      "expected_tool": "search_questions",
+      "actual_chain": [
+        "search_questions"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": null,
+      "finish_reason": "completed",
+      "total_ms": 3.5222999999859894,
+      "usage": {},
+      "source_count": 4,
+      "question_count": 4,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n2024期末练习卷.pdf · 第 3 题\n3. DFS 通常使用____保存待访问节点。（2分）【知识点：DFS\n】\n\n2024期末练习卷.pdf · 第 14 题\n14. 比较 BFS 与 DFS 使用的数据结构。（8分）【知识点：B\nFS、DFS】\n\n2025期末练习卷.docx · 第 3 题\n3. DFS 通常使用____保存待访问节点。（2分）【知识点：DFS】\n\n2025期末练习卷.docx · 第 14 题\n14. 比较 BFS 与 DFS 使用的数据结构。（8分）【知识点：BFS、DFS】\n\n匹配到多道题，可在题库中选择具体题目进行分析。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "解释2025期末第12题",
+      "expected_tool": "search_questions",
+      "expected_chain": [
+        "search_questions",
+        "get_question",
+        "analyze_question"
+      ],
+      "actual_chain": [
+        "search_questions",
+        "get_question",
+        "analyze_question"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": true,
+      "finish_reason": "completed",
+      "total_ms": 17.11909999994532,
+      "usage": {},
+      "source_count": 7,
+      "question_count": 6,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n2025期末练习卷.docx · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识点：A*、启发式函数】\n\n2023课堂练习.pptx · 第 12 题\n12. 解释 A* 的评价函数。【知识点：A*】\n\n2024期末练习卷.pdf · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n2024期末练习卷.pdf · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识\n点：A*、启发式函数】\n\n2024期末练习卷.pdf · 第 13 题\n13. 若 g(n)=3、h(n)=5，计算 A* 的 f(n)。（4\n分）【知识点：A*】\n\n2025期末练习卷.docx · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n匹配到多道题，可在题库中选择具体题目进行分析。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "分析2024期末第13题",
+      "expected_tool": "search_questions",
+      "expected_chain": [
+        "search_questions",
+        "get_question",
+        "analyze_question"
+      ],
+      "actual_chain": [
+        "search_questions",
+        "get_question",
+        "analyze_question"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": true,
+      "finish_reason": "completed",
+      "total_ms": 12.29719999992085,
+      "usage": {},
+      "source_count": 6,
+      "question_count": 6,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n2024期末练习卷.pdf · 第 13 题\n13. 若 g(n)=3、h(n)=5，计算 A* 的 f(n)。（4\n分）【知识点：A*】\n\n2023课堂练习.pptx · 第 12 题\n12. 解释 A* 的评价函数。【知识点：A*】\n\n2024期末练习卷.pdf · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n2024期末练习卷.pdf · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识\n点：A*、启发式函数】\n\n2025期末练习卷.docx · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n2025期末练习卷.docx · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识点：A*、启发式函数】\n\n匹配到多道题，可在题库中选择具体题目进行分析。",
+      "manual_answer_correct": null
+    },
+    {
+      "question": "解释2023课堂第12题",
+      "expected_tool": "search_questions",
+      "expected_chain": [
+        "search_questions",
+        "get_question",
+        "analyze_question"
+      ],
+      "actual_chain": [
+        "search_questions",
+        "get_question",
+        "analyze_question"
+      ],
+      "first_tool_correct": true,
+      "chain_exact_match": true,
+      "finish_reason": "completed",
+      "total_ms": 10.658199999852513,
+      "usage": {},
+      "source_count": 6,
+      "question_count": 6,
+      "answer": "演示模式未调用 LLM，仅展示工具执行结果，未生成参考答案。\n\n2023课堂练习.pptx · 第 12 题\n12. 解释 A* 的评价函数。【知识点：A*】\n\n2024期末练习卷.pdf · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n2024期末练习卷.pdf · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识\n点：A*、启发式函数】\n\n2024期末练习卷.pdf · 第 13 题\n13. 若 g(n)=3、h(n)=5，计算 A* 的 f(n)。（4\n分）【知识点：A*】\n\n2025期末练习卷.docx · 第 1 题\n1. A* 的评价函数是什么？（2分）【知识点：A*】\nA. f(n)=g(n)+h(n)\nB. f(n)=g(n)-h(n)\n\n2025期末练习卷.docx · 第 12 题\n12. 解释 A* 中 g(n) 和 h(n) 的含义。（6分）【知识点：A*、启发式函数】\n\n匹配到多道题，可在题库中选择具体题目进行分析。",
+      "manual_answer_correct": null
+    }
+  ]
+}

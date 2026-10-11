@@ -1,0 +1,14 @@
+[
+  {"question":"A* 是什么？","expected_tool":"search_knowledge"},
+  {"question":"解释一下 BFS","expected_tool":"search_knowledge"},
+  {"question":"DFS 使用什么数据结构？","expected_tool":"search_knowledge"},
+  {"question":"教材哪里讲了 A*？","expected_tool":"locate_source"},
+  {"question":"定位 BFS","expected_tool":"locate_source"},
+  {"question":"A* 在哪里？","expected_tool":"locate_source"},
+  {"question":"A* 以前怎么考过？","expected_tool":"search_questions"},
+  {"question":"BFS 相关题目","expected_tool":"search_questions"},
+  {"question":"DFS 历年试题","expected_tool":"search_questions"},
+  {"question":"解释2025期末第12题","expected_tool":"search_questions","expected_chain":["search_questions","get_question","analyze_question"]},
+  {"question":"分析2024期末第13题","expected_tool":"search_questions","expected_chain":["search_questions","get_question","analyze_question"]},
+  {"question":"解释2023课堂第12题","expected_tool":"search_questions","expected_chain":["search_questions","get_question","analyze_question"]}
+]

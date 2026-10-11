@@ -1,0 +1,22 @@
+{
+  "drag_upload": true,
+  "agent_chain": true,
+  "wrongbook_and_self_assessment": true,
+  "plan_checklist": true,
+  "generated_practice_and_download": true,
+  "persistence_and_history": true,
+  "palette_and_theme": true,
+  "course_race_guard": true,
+  "responsive_widths": [
+    320,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "reduced_motion": true,
+  "javascript_errors": 0,
+  "date": "2026-10-08",
+  "mode": "demo",
+  "note": "真实 Edge 浏览器工程验收，未调用外部模型。"
+}

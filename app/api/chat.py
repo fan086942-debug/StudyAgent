@@ -12,4 +12,6 @@ def search(body: SearchRequest, request: Request):
 
 @router.post("/chat", response_model=ChatResponse)
 def chat(body: SearchRequest, request: Request):
-    return request.app.state.qa.answer(body)
+    result = request.app.state.qa.answer(body)
+    request.app.state.learning.save_conversation(body, "chat", result)
+    return result

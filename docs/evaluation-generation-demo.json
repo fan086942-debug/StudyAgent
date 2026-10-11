@@ -1,0 +1,168 @@
+{
+  "created_at": "2026-09-30T05:01:01.069450+00:00",
+  "mode": "demo",
+  "note": "4 个原创小样本，默认检索阈值。demo 仅验证摘录与保存流程；API 结果仍需人工核对。",
+  "passed": 4,
+  "cases": 4,
+  "results": [
+    {
+      "kind": "review",
+      "topics": [
+        "A* 评价函数"
+      ],
+      "expected_status": 201,
+      "actual_status": 201,
+      "passed": true,
+      "manual_factual_correctness": null,
+      "source_count": 3,
+      "question_count": 0,
+      "content": {
+        "title": "复习资料 · 原文摘录",
+        "sections": [
+          {
+            "topic": "A* 评价函数",
+            "summary": "以下为检索原文，请结合完整资料自行整理。",
+            "key_points": [
+              "A* 评价函数中的 h(n) 表示从当前节点到目标的估计代价。",
+              "A* 评价函数中的 g(n) 表示从起点到当前节点的实际路径代价。",
+              "A* 评价函数为 f(n)=g(n)+h(n)，用于比较待扩展节点。"
+            ],
+            "pitfalls": [],
+            "citation_ids": [
+              "S1",
+              "S2",
+              "S3"
+            ]
+          }
+        ],
+        "questions": [],
+        "insufficient_evidence": false
+      },
+      "usage": {},
+      "saved": true,
+      "download_status": 200
+    },
+    {
+      "kind": "review",
+      "topics": [
+        "A* 评价函数",
+        "BFS 队列"
+      ],
+      "expected_status": 201,
+      "actual_status": 201,
+      "passed": true,
+      "manual_factual_correctness": null,
+      "source_count": 4,
+      "question_count": 0,
+      "content": {
+        "title": "复习资料 · 原文摘录",
+        "sections": [
+          {
+            "topic": "A* 评价函数",
+            "summary": "以下为检索原文，请结合完整资料自行整理。",
+            "key_points": [
+              "A* 评价函数中的 h(n) 表示从当前节点到目标的估计代价。",
+              "A* 评价函数中的 g(n) 表示从起点到当前节点的实际路径代价。",
+              "A* 评价函数为 f(n)=g(n)+h(n)，用于比较待扩展节点。"
+            ],
+            "pitfalls": [],
+            "citation_ids": [
+              "S1",
+              "S2",
+              "S3"
+            ]
+          },
+          {
+            "topic": "BFS 队列",
+            "summary": "以下为检索原文，请结合完整资料自行整理。",
+            "key_points": [
+              "BFS 使用先进先出的队列，按层次扩展节点。"
+            ],
+            "pitfalls": [],
+            "citation_ids": [
+              "S4"
+            ]
+          }
+        ],
+        "questions": [],
+        "insufficient_evidence": false
+      },
+      "usage": {},
+      "saved": true,
+      "download_status": 200
+    },
+    {
+      "kind": "mock_exam",
+      "topics": [
+        "A* 评价函数"
+      ],
+      "expected_status": 201,
+      "actual_status": 201,
+      "passed": true,
+      "manual_factual_correctness": null,
+      "source_count": 3,
+      "question_count": 3,
+      "content": {
+        "title": "模拟练习 · 摘录简答",
+        "sections": [],
+        "questions": [
+          {
+            "topic": "A* 评价函数",
+            "type": "short_answer",
+            "difficulty": "medium",
+            "stem": "阅读材料：A* 评价函数中的 h(n) 表示从当前节点到目标的估计代价。\n请概括这段材料中与「A* 评价函数」相关的要点。",
+            "options": [],
+            "answer": "A* 评价函数中的 h(n) 表示从当前节点到目标的估计代价。",
+            "explanation": "演示参考摘录：请对照原文检查概括是否保留关键条件，未使用模型评分。",
+            "citation_ids": [
+              "S1"
+            ]
+          },
+          {
+            "topic": "A* 评价函数",
+            "type": "short_answer",
+            "difficulty": "medium",
+            "stem": "阅读材料：A* 评价函数中的 g(n) 表示从起点到当前节点的实际路径代价。\n请概括这段材料中与「A* 评价函数」相关的要点。",
+            "options": [],
+            "answer": "A* 评价函数中的 g(n) 表示从起点到当前节点的实际路径代价。",
+            "explanation": "演示参考摘录：请对照原文检查概括是否保留关键条件，未使用模型评分。",
+            "citation_ids": [
+              "S2"
+            ]
+          },
+          {
+            "topic": "A* 评价函数",
+            "type": "short_answer",
+            "difficulty": "medium",
+            "stem": "阅读材料：A* 评价函数为 f(n)=g(n)+h(n)，用于比较待扩展节点。\n请概括这段材料中与「A* 评价函数」相关的要点。",
+            "options": [],
+            "answer": "A* 评价函数为 f(n)=g(n)+h(n)，用于比较待扩展节点。",
+            "explanation": "演示参考摘录：请对照原文检查概括是否保留关键条件，未使用模型评分。",
+            "citation_ids": [
+              "S3"
+            ]
+          }
+        ],
+        "insufficient_evidence": false
+      },
+      "usage": {},
+      "saved": true,
+      "download_status": 200
+    },
+    {
+      "kind": "review",
+      "topics": [
+        "量子纠缠贝尔不等式"
+      ],
+      "expected_status": 409,
+      "actual_status": 409,
+      "passed": true,
+      "manual_factual_correctness": null,
+      "error": {
+        "code": "generation_no_evidence",
+        "message": "主题「量子纠缠贝尔不等式」没有检索到可用依据，请补充资料或缩小主题范围",
+        "request_id": "c0af5f27501444c990138ebda0917a32"
+      }
+    }
+  ]
+}

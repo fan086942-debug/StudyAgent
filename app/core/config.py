@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     retrieval_top_k: int = Field(default=6, ge=1, le=20)
     min_similarity: float = Field(default=0.25, ge=-1, le=1)
     context_char_budget: int = Field(default=9000, ge=1000, le=30000)
+    exam_batch_chars: int = Field(default=12000, ge=4000, le=20000)
+    exam_max_batches: int = Field(default=20, ge=1, le=100)
+    generation_max_tokens: int = Field(default=8000, ge=1000, le=16000)
+    agent_max_steps: int = Field(default=6, ge=1, le=12)
+    agent_context_chars: int = Field(default=60000, ge=10000, le=150000)
 
     @model_validator(mode="after")
     def validate_settings(self):

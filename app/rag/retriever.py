@@ -37,6 +37,7 @@ class Retriever:
                 vector, request.course_id, ready, self.settings.retrieval_candidates
             )
             sources, seen, budget = [], set(), self.settings.context_char_budget
+            #阈值过滤
             for chunk_id, distance in hits:
                 score = 1 - float(distance)
                 if score < self.settings.min_similarity:

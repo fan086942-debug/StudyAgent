@@ -25,6 +25,7 @@ class QAService:
             insufficient = True
         elif sources:
             llm_start = time.perf_counter()
+            # 将筛选后的正文与引用编号交给模型，真实文件位置由后端的 Source 提供。
             result = self.llm.generate(
                 request.question,
                 [{"id": source.citation_id, "text": source.text} for source in sources],
@@ -32,6 +33,7 @@ class QAService:
             llm_ms = (time.perf_counter() - llm_start) * 1000
             usage = result.usage
             content = result.content
+            # 检查声明引用、正文引用与检索来源是否一致；此校验不判断内容是否被证据支持。
             available = {source.citation_id for source in sources}
             claimed = set(content.citation_ids)
             inline = set(re.findall(r"\[(S\d+)\]", content.answer))

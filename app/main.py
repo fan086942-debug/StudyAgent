@@ -10,18 +10,21 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.agent import router as agent_router
 from app.api.chat import router as chat_router
+from app.api.connection import router as connection_router
 from app.api.courses import router as courses_router
 from app.api.documents import router as documents_router
+from app.api.exams import router as exams_router
+from app.api.generation import router as generation_router
+from app.api.learning import router as learning_router
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.db.session import make_database
-from app.llm.compatible_provider import CompatibleLLM
 from app.rag.embedding import APIEmbedding, DemoEmbedding
 from app.rag.retriever import Retriever
 from app.rag.vector_store import VectorStore
-from app.services.ingestion import IngestionService
-from app.services.qa import QAService
+from app.services.connection import ModelConnection
 
 logger = logging.getLogger("studyagent")
 
@@ -48,22 +51,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
             vectors = VectorStore(settings, embeddings.fingerprint)
             app.state.embeddings, app.state.vectors = embeddings, vectors
-            app.state.ingestion = IngestionService(settings, sessions, embeddings, vectors)
+            app.state.retriever = Retriever(settings, sessions, embeddings, vectors)
+            app.state.connection = ModelConnection(app.state, settings)
+            app.state.exams.recover_interrupted()
             app.state.ingestion.recover_interrupted()
             app.state.ingestion.mark_stale()
-            app.state.retriever = Retriever(settings, sessions, embeddings, vectors)
-            app.state.qa = QAService(settings, app.state.retriever, CompatibleLLM(settings, client))
             try:
                 yield
             finally:
                 vectors.client.close()
                 engine.dispose()
 
-    app = FastAPI(title="StudyAgent", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="StudyAgent", version="0.4.0", lifespan=lifespan)
     app.state.settings = settings
     app.include_router(courses_router)
     app.include_router(documents_router)
     app.include_router(chat_router)
+    app.include_router(exams_router)
+    app.include_router(agent_router)
+    app.include_router(generation_router)
+    app.include_router(learning_router)
+    app.include_router(connection_router)
     static = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")
 
@@ -75,6 +83,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def request_log(request: Request, call_next):
         request.state.request_id = uuid4().hex
         start = time.perf_counter()
+        connection = getattr(app.state, "connection", None)
+        guarded = bool(
+            connection
+            and request.url.path.startswith("/api/")
+            and not request.url.path.startswith("/api/connection")
+        )
+        if guarded:
+            connection.enter_request()
         try:
             response = await call_next(request)
         except Exception as exc:
@@ -88,6 +104,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "request_id": request.state.request_id,
                 },
             )
+        finally:
+            if guarded:
+                connection.leave_request()
         response.headers["X-Request-ID"] = request.state.request_id
         logger.info(
             "request=%s method=%s path=%s status=%s elapsed_ms=%.1f",
@@ -124,6 +143,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "mode": settings.study_mode, "version": "0.1.0"}
+        return {
+            "status": "ok",
+            "mode": app.state.settings.study_mode,
+            "version": "0.4.0",
+            "max_upload_mb": settings.max_upload_mb,
+        }
 
     return app

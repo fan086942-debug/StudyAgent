@@ -14,9 +14,10 @@ logger = logging.getLogger("studyagent")
 
 
 class IngestionService:
-    def __init__(self, settings, sessions, embeddings, vectors):
+    def __init__(self, settings, sessions, embeddings, vectors, exams=None):
         self.settings, self.sessions = settings, sessions
         self.embeddings, self.vectors = embeddings, vectors
+        self.exams = exams
         self.lock = Lock()
 
     def recover_interrupted(self):
@@ -32,7 +33,14 @@ class IngestionService:
         if not self.lock.acquire(blocking=False):
             raise AppError("ingestion_busy", "已有资料正在处理，请稍后重试", 409)
         try:
-            return self._process(document_id)
+            document = self._process(document_id)
+            if self.exams is not None and document.document_type == "exam":
+                try:
+                    self.exams.extract(document_id)
+                except AppError as exc:
+                    # 试卷结构化有独立状态和重试入口，失败不撤销已经可用的 RAG 索引。
+                    logger.warning("exam_extract document=%s error=%s", document_id, exc.code)
+            return document
         finally:
             self.lock.release()
 
@@ -49,6 +57,7 @@ class IngestionService:
                     delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
                 )
                 session.commit()
+                # 入库链路：解析带位置的文本块 → 分块 → 向量化 → 写入向量索引及正文。
                 parsed = parse_document(Path(document.storage_path))
                 pieces = chunk_blocks(
                     parsed.blocks, self.settings.chunk_size, self.settings.chunk_overlap
@@ -67,6 +76,7 @@ class IngestionService:
                 ]
                 embeddings = self.embeddings.embed([chunk.text for chunk in chunks])
                 self.vectors.add(chunks, embeddings)
+                # 向量写入成功后提交正文与 ready 状态，使检索只读取已完成索引的资料。
                 session.add_all(chunks)
                 document.chunk_count = len(chunks)
                 document.warning = "；".join(parsed.warnings) or None
@@ -79,6 +89,7 @@ class IngestionService:
                 return document
             except Exception as exc:
                 session.rollback()
+                # Chroma 与关系数据库不共享事务，失败时需额外清理可能已写入的向量。
                 try:
                     self.vectors.delete_document(document_id)
                 except AppError:

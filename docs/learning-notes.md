@@ -48,6 +48,10 @@
 
 ## 6. 后续 Agent 的接口边界
 
-Phase 1 的检索和问答服务可以在 Phase 2 封装为 `search_knowledge`、`locate_source` 工具。真正的 Agent 还需要模型选择工具、执行工具、读取 Observation 并判断下一步；本阶段没有这条循环。
+Phase 1 只实现固定检索问答流程。Phase 2 已将检索封装为 `search_knowledge`、`locate_source` 等工具，并加入模型选择工具、执行、读取 Observation 和判断下一步的循环，详见 [第二阶段讲解](phase2.md)。
 
 未来必须设最大步数、工具参数 Schema、失败重试上限和课程权限范围。Memory、Planning 和 ReAct 会在实现时分别讲解，不提前引入框架隐藏逻辑。
+
+## Phase 3：结构化生成
+
+生成服务在逐主题检索后校验覆盖、题数和引用，一次事务保存正文与来源快照。生成题目与历史原题分开，模型输出格式验证不等于事实正确性验证。完整阅读路径和面试问题见 [Phase 3](phase3.md)。

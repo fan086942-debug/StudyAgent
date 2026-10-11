@@ -1,0 +1,75 @@
+// Requires scripts/connection_preview.py: isolated data and simulated upstream model.
+const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+(async () => {
+  const browser = await chromium.launch({channel: 'msedge', headless: true});
+  const errors = [];
+  const page = await browser.newPage({viewport: {width: 1440, height: 1000}});
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.goto('http://127.0.0.1:8766');
+    await page.locator('#mode').filter({hasText: /模式/}).waitFor();
+    await page.locator('#course-name').fill('模型连接 · 独立验收');
+    await page.locator('#course-form button').click();
+    await page.locator('#status').filter({hasText: '课程已创建'}).waitFor();
+    await page.locator('#mode').click();
+    await page.waitForFunction(() => !document.querySelector('#connection-model').disabled);
+    assert.equal(await page.locator('#connection-mode').inputValue(), 'api');
+    await page.locator('#connection-url').fill('https://model.example/v1');
+    await page.locator('#connection-model').fill('browser-test-model');
+    await page.locator('#connection-key').fill('browser-fake-key');
+    await page.locator('#connection-test').click();
+    await page.locator('#connection-status').filter({hasText: '连接成功'}).waitFor();
+    fs.mkdirSync('docs/screenshots', {recursive: true});
+    await page.screenshot({path: 'docs/screenshots/connection-desktop.png', animations: 'disabled'});
+    await page.locator('#connection-save').click();
+    await page.locator('#connection-status').filter({hasText: '已启用 browser-test-model'}).waitFor();
+    assert.equal(await page.locator('#connection-key').inputValue(), '');
+    assert.equal(await page.evaluate(() => JSON.stringify(localStorage).includes('browser-fake-key')), false);
+    await page.keyboard.press('Escape');
+    await page.locator('#question').fill('查看学习进度');
+    await page.locator('#question').press('Control+Enter');
+    await page.locator('#result').waitFor();
+    await page.locator('#trace-panel summary').click();
+    assert.ok((await page.locator('.tool-step').innerText()).includes('get_learning_progress'));
+    assert.ok((await page.locator('#answer').innerText()).includes('练习'));
+    await page.reload();
+    await page.locator('#mode').filter({hasText: 'API 模式'}).waitFor();
+    await page.locator('#mode').click();
+    await page.waitForFunction(() => !document.querySelector('#connection-model').disabled);
+    assert.equal(await page.locator('#connection-model').inputValue(), 'browser-test-model');
+    assert.equal(await page.locator('#connection-key').inputValue(), '');
+    await page.locator('#connection-test').click();
+    await page.locator('#connection-status').filter({hasText: '连接成功'}).waitFor();
+    await page.locator('#connection-key').fill('temporary-test-key');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#connection-key').inputValue(), '');
+    await page.locator('#theme-toggle').click();
+    await page.locator('#mode').click();
+    await page.waitForFunction(() => !document.querySelector('#connection-model').disabled);
+    await page.screenshot({path: 'docs/screenshots/connection-dark.png', animations: 'disabled'});
+    await page.keyboard.press('Escape');
+    const widths = [];
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({width, height: 844});
+      await page.locator('#mode').click();
+      await page.waitForFunction(() => !document.querySelector('#connection-model').disabled);
+      const rect = await page.locator('#connection-dialog').boundingBox();
+      assert.ok(rect.x >= 0 && rect.x + rect.width <= width);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      if (width === 390) await page.screenshot({path: 'docs/screenshots/connection-mobile.png', animations: 'disabled'});
+      widths.push(width);
+      await page.keyboard.press('Escape');
+    }
+    await page.locator('#mode').click();
+    await page.waitForFunction(() => !document.querySelector('#connection-model').disabled);
+    await page.locator('#connection-mode').selectOption('demo');
+    await page.locator('#connection-save').click();
+    await page.locator('#connection-status').filter({hasText: '已切换为离线演示'}).waitFor();
+    assert.deepEqual(errors, []);
+    const result = {simulated_provider: true, connection_test: true, api_agent_tool_call: true, reload_persistence: true, secret_not_in_browser_storage: true, cleared_key: true, demo_switch: true, widths, javascript_errors: errors};
+    fs.writeFileSync('docs/evaluation-connection-ui.json', JSON.stringify(result, null, 2) + '\n');
+    console.log(JSON.stringify(result, null, 2));
+  } finally { await browser.close(); }
+})().catch(error => {console.error(error); process.exitCode = 1;});
