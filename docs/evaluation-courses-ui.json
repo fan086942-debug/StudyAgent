@@ -1,0 +1,11 @@
+{
+  "upload_limit_mb": 200,
+  "cancel_preserves_data": true,
+  "busy_allows_retry": true,
+  "mobile_dark_dialog": true,
+  "confirmed_delete_removes_file_and_course": true,
+  "other_course_preserved": true,
+  "empty_selection_stats_and_reload": true,
+  "escape_cancels": true,
+  "javascript_errors": []
+}

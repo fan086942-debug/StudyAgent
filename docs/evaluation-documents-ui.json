@@ -1,0 +1,9 @@
+{
+  "empty_first_visit_with_existing_data": true,
+  "delete_cancel_preserves_file": true,
+  "confirmed_delete_removes_file_and_paper": true,
+  "selection_and_stats_refreshed": true,
+  "persists_after_reload": true,
+  "mobile_dialog": true,
+  "javascript_errors": []
+}

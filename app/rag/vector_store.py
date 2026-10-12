@@ -22,7 +22,19 @@ class VectorStore:
             self.collection.delete(where={"document_id": document_id})
         except Exception as exc:
             raise AppError("index_failed", "向量索引清理失败，请重试", 503) from exc
-    #将embedinig向量和chunk存入向量索引
+
+    def delete_document_everywhere(self, document_id: str):
+        """Remove a document from current and previous embedding collections."""
+        try:
+            for collection in self.client.list_collections():
+                if collection.name.startswith("chunks-"):
+                    self.client.get_collection(collection.name, embedding_function=None).delete(
+                        where={"document_id": document_id}
+                    )
+        except Exception as exc:
+            raise AppError("index_failed", "向量索引清理失败，请重试删除", 503) from exc
+
+    # 将embedinig向量和chunk存入向量索引
     def add(self, chunks, vectors):
         try:
             for start in range(0, len(chunks), 100):

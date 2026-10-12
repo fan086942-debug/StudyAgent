@@ -73,7 +73,14 @@ class ExamService:
             paper.status, paper.error = "processing", None
             session.commit()
             try:
-                parsed = build_exam_text(parse_document(Path(doc.storage_path)).blocks)
+                parsed = build_exam_text(
+                    parse_document(
+                        Path(doc.storage_path),
+                        settings=self.settings,
+                        cache_dir=self.settings.data_dir / "ocr" / document_id,
+                        digest=doc.sha256,
+                    ).blocks
+                )
                 candidates = []
                 if self.settings.study_mode == "demo":
                     cursor = 0

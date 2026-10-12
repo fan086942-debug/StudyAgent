@@ -1,0 +1,11 @@
+{
+  "cancel_button_stops_ocr": true,
+  "cancelled_has_no_search_sources": true,
+  "original_file_kept": true,
+  "completed_pages_cached": 4,
+  "reload_keeps_cancelled_state": true,
+  "retry_reuses_cache": true,
+  "mobile_layout": true,
+  "delete_cleans_cache": true,
+  "javascript_errors": []
+}

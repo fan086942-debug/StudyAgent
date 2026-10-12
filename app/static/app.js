@@ -1,7 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const selected = new Set();
 let currentCourse = "";
-let maxUploadMb = 25;
+let maxUploadMb = 200;
+let documentRefreshTimer = null;
 
 function status(message, error = false) {
   $("status").textContent = message;
@@ -29,17 +30,19 @@ function element(tag, text, className) {
 async function loadCourses(preferred) {
   const courses = await api("/api/courses");
   $("course").replaceChildren();
+  const placeholder = element("option", courses.length ? "选择课程 · 从你的资料开始" : "请先创建课程");
+  placeholder.value = ""; $("course").append(placeholder);
   for (const course of courses) {
     const option = element("option", course.name);
     option.value = course.id;
     $("course").append(option);
   }
-  if (!courses.length) $("course").append(element("option", "请先创建课程"));
   let stored;
   try { stored = localStorage.getItem("study-course"); } catch {}
   const desired = preferred || stored;
-  if (desired && courses.some(c => c.id === desired)) $("course").value = desired;
-  currentCourse = courses.length ? $("course").value : "";
+  $("course").value = desired && courses.some(c => c.id === desired) ? desired : "";
+  currentCourse = $("course").value;
+  $("course-delete-open").hidden = !currentCourse;
   selected.clear();
   resetLearning();
   $("result").hidden = true;
@@ -47,16 +50,42 @@ async function loadCourses(preferred) {
   await Promise.all([loadDocuments(), loadArtifacts(), refreshProgress()]);
 }
 async function loadDocuments() {
+  clearTimeout(documentRefreshTimer);
   const courseId = currentCourse;
-  if (!courseId) return;
+  if (!courseId) {
+    $("upload-button").disabled = false;
+    selected.clear(); $("document-count").textContent = "0"; updateScope();
+    $("documents").replaceChildren(element("p", "资料库是空的。创建或选择一门课程，上传你的第一份资料。", "empty"));
+    $("papers").replaceChildren(element("p", "选择课程后，查看你上传的试卷。", "empty"));
+    $("paper-filter").replaceChildren(element("option", "全部已解析试卷"));
+    $("paper-filter").firstElementChild.value = "";
+    $("question-list").replaceChildren(element("p", "选择课程并上传试卷后，开始练习。", "empty"));
+    return;
+  }
   const epoch = scopeEpoch;
   const documents = await api(`/api/courses/${courseId}/documents`);
   if (courseId !== currentCourse || epoch !== scopeEpoch) return;
+  const processing = documents.some(doc => ["processing", "cancelling"].includes(doc.status));
+  const pendingIds = documents.filter(doc => ["processing", "cancelling"].includes(doc.status)).map(doc => doc.id);
+  $("upload-button").disabled = processing;
+  if (processing) documentRefreshTimer = setTimeout(async function poll() {
+    if (currentCourse !== courseId || scopeEpoch !== epoch) return;
+    try {
+      const latest = await loadDocuments(); await refreshProgress();
+      if (currentCourse !== courseId || scopeEpoch !== epoch) return;
+      if (latest && !latest.some(doc => ["processing", "cancelling"].includes(doc.status))) {
+        const failed = latest.find(doc => pendingIds.includes(doc.id) && doc.status === "failed");
+        const cancelled = latest.find(doc => pendingIds.includes(doc.id) && doc.status === "cancelled");
+        status(failed ? `${failed.name}：${failed.error || "处理失败，请重试"}` : cancelled ? "处理已取消。原文件和已识别缓存保留，点击重试可继续。" : "资料处理完成，已建立索引，可以开始提问。", !!failed);
+      }
+    }
+    catch (error) { status(error.message, true); documentRefreshTimer = setTimeout(poll, 4000); }
+  }, 2000);
   selected.forEach(id => { if (!documents.some(d => d.id === id && d.status === "ready")) selected.delete(id); });
   $("document-count").textContent = documents.length;
   updateScope();
   $("documents").replaceChildren();
-  const names = { ready: "可检索", processing: "正在处理", failed: "处理失败", stale: "需要重建" };
+  const names = { ready: "可检索", processing: "正在处理", cancelling: "正在停止", cancelled: "已取消 · 可重试", failed: "处理失败", stale: "需要重建", deleting: "删除未完成 · 可重试" };
   for (const doc of documents) {
     const row = element("div", undefined, "document");
     const box = element("input"); box.type = "checkbox"; box.id = `doc-${doc.id}`;
@@ -66,20 +95,36 @@ async function loadDocuments() {
     box.addEventListener("change", () => { box.checked ? selected.add(doc.id) : selected.delete(doc.id); updateScope(); });
     const label = element("label", doc.name); label.htmlFor = box.id;
     label.append(element("small", `${names[doc.status] || doc.status} · ${doc.chunk_count} 个片段`));
-    if (doc.error || doc.warning) label.append(element("small", doc.error || doc.warning, "doc-error"));
-    if (["failed", "stale"].includes(doc.status)) {
+    if (doc.error || doc.warning) label.append(element("small", doc.error || doc.warning, ["processing", "cancelling", "cancelled"].includes(doc.status) ? "doc-progress" : "doc-error"));
+    const actions = element("div", undefined, "document-actions");
+    if (["processing", "cancelling"].includes(doc.status)) {
+      const cancel = element("button", doc.status === "cancelling" ? "正在停止…" : "取消处理", "link-button document-cancel"); cancel.type = "button";
+      cancel.disabled = doc.status === "cancelling"; cancel.setAttribute("aria-label", `取消处理：${doc.name}`);
+      cancel.addEventListener("click", async () => {
+        cancel.disabled = true;
+        try { await api(`/api/documents/${doc.id}/cancel`, {method: "POST"}); status("取消请求已提交，当前页或接口结束后会停止，已识别缓存会保留。"); }
+        catch (error) { status(error.message, true); }
+        finally { await loadDocuments().catch(error => status(error.message, true)); }
+      }); actions.append(cancel);
+    }
+    if (["failed", "stale", "cancelled"].includes(doc.status)) {
       const retry = element("button", "重试 / 重建", "link-button"); retry.type = "button";
       retry.addEventListener("click", async (event) => {
         event.preventDefault(); retry.disabled = true; status(`正在处理 ${doc.name}…`);
-        try { await api(`/api/documents/${doc.id}/retry`, { method: "POST" }); status("资料已可检索。"); }
+        try { const result = await api(`/api/documents/${doc.id}/retry?background=true`, { method: "POST" }); status(result.status === "processing" ? "已开始后台处理，进度会自动更新。" : "资料已可检索。"); }
         catch (error) { status(error.message, true); }
         finally { await loadDocuments(); }
-      }); label.append(retry);
+      }); actions.append(retry);
     }
-    row.append(box, label); $("documents").append(row);
+    const remove = element("button", "删除", "link-button document-delete"); remove.type = "button";
+    remove.setAttribute("aria-label", `删除资料：${doc.name}`); remove.disabled = ["processing", "cancelling"].includes(doc.status);
+    remove.addEventListener("click", () => openDocumentDelete(doc, courseId));
+    actions.append(remove);
+    row.append(box, label, actions); $("documents").append(row);
   }
   if (!documents.length) $("documents").append(element("p", "还没有资料。上传第一份教材或课件吧。", "empty"));
   await loadPapers(documents);
+  return documents;
 }
 $("course-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -94,6 +139,7 @@ $("course-form").addEventListener("submit", async (event) => {
 });
 $("course").addEventListener("change", async () => {
   currentCourse = $("course").value; selected.clear(); resetLearning(); $("result").hidden = true;
+  $("course-delete-open").hidden = !currentCourse;
   try { localStorage.setItem("study-course", currentCourse); } catch {}
   $("question-list").replaceChildren();
   resetArtifacts();
@@ -106,6 +152,7 @@ $("upload-form").addEventListener("submit", async (event) => {
   const courseId = currentCourse, epoch = scopeEpoch, documentType = $("document-type").value;
   $("upload-button").disabled = true;
   const failures = [];
+  let backgroundPending = false;
   const files = Array.from($("files").files);
   if (!files.length || files.some(file => !/\.(pdf|pptx|docx)$/i.test(file.name) || file.size > maxUploadMb * 1024 * 1024)) {
     $("upload-button").disabled = false;
@@ -113,15 +160,16 @@ $("upload-form").addEventListener("submit", async (event) => {
   }
   for (const file of files) {
     const data = new FormData(); data.append("file", file); data.append("document_type", documentType);
+    if (files.length === 1 && /\.pdf$/i.test(file.name)) data.append("background", "true");
     status(`正在解析与索引：${file.name}。大文件或远程模型可能需要较长时间…`);
-    try { await api(`/api/courses/${courseId}/documents`, { method: "POST", body: data }); }
+    try { const result = await api(`/api/courses/${courseId}/documents`, { method: "POST", body: data }); backgroundPending = result.status === "processing"; }
     catch (error) { failures.push(`${file.name}：${error.message}`); status(failures.at(-1), true); }
     if (courseId === currentCourse && epoch === scopeEpoch) await loadDocuments().catch(() => {});
   }
-  $("upload-button").disabled = false; $("files").value = ""; updateFiles();
+  $("upload-button").disabled = backgroundPending; $("files").value = ""; updateFiles();
   if (courseId !== currentCourse || epoch !== scopeEpoch) return;
   await refreshProgress().catch(() => {});
-  status(failures.length ? `上传处理结束：${files.length - failures.length} 份成功。${failures.join("；")}` : "资料已建立索引，可以开始提问。", failures.length > 0);
+  status(failures.length ? `上传处理结束：${files.length - failures.length} 份成功。${failures.join("；")}` : backgroundPending ? "文件已接收，正在后台解析与 OCR，资料列表会自动更新进度。" : "资料已建立索引，可以开始提问。", failures.length > 0);
 });
 $("question-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -260,8 +308,8 @@ $("question-search-form").addEventListener("submit", async event => {
 async function start() {
   try {
     const health = await api("/health");
-    maxUploadMb = health.max_upload_mb || 25;
-    document.querySelector(".upload-hint").textContent = `文本型文件 · 单文件上限 ${maxUploadMb} MB`;
+    maxUploadMb = health.max_upload_mb || 200;
+    document.querySelector(".upload-hint").textContent = `${health.ocr_enabled ? "扫描 PDF 自动 OCR" : "文本型文件"} · 单文件上限 ${maxUploadMb} MB`;
     updateModelMode(health.mode);
     await loadCourses();
   } catch (error) { status(error.message, true); }
@@ -543,7 +591,7 @@ $("drop-zone").addEventListener("drop", event => {
   const transfer = new DataTransfer(); files.forEach(file => transfer.items.add(file));
   $("files").files = transfer.files; updateFiles();
 });
-function updateScope() { $("scope-note").textContent = selected.size ? `已勾选 ${selected.size} 份 · 限定检索与生成范围` : "未勾选 · 使用当前课程全部资料"; }
+function updateScope() { $("scope-note").textContent = !currentCourse ? "尚未选择课程 · 资料为空" : selected.size ? `已勾选 ${selected.size} 份 · 限定检索与生成范围` : "未勾选 · 使用当前课程全部资料"; }
 function setAnalyzing(active) {
   clearInterval(requestTimer);
   $("analysis-progress").hidden = !active;
@@ -559,7 +607,9 @@ function resetLearning() {
   status(""); notify("");
   questionController?.abort(); askEpoch += 1; $("ask-button").disabled = false; setAnalyzing(false);
   wrongOffset = planOffset = historyOffset = 0;
-  for (const id of ["stat-documents", "stat-attempts", "stat-wrong", "stat-plan"]) $(id).textContent = "—";
+  for (const id of ["stat-documents", "stat-attempts", "stat-wrong"]) $(id).textContent = "0";
+  $("stat-plan").textContent = "—";
+  $("accuracy-note").textContent = "尚未记录练习。选择课程后，查看真实学习进度。";
   for (const id of ["wrongbook", "plans", "conversation-history", "activity-chart", "weak-topics", "agent-learning"]) $(id).replaceChildren();
   $("wrongbook").append(element("p", "选择课程后，查看你的错题与练习记录。", "empty"));
   $("plans").append(element("p", "选择课程并创建复习计划，按自己的节奏前进。", "empty"));
@@ -570,6 +620,86 @@ function resetLearning() {
   $("welcome").hidden = false; $("wrong-count").textContent = "0"; $("wrong-nav-count").textContent = "04";
   updateScope();
 }
+let pendingCourseDelete = null;
+let courseDeleteBusy = false;
+$("course-delete-open").addEventListener("click", () => {
+  if (!currentCourse || courseDeleteBusy) return;
+  pendingCourseDelete = {id: currentCourse, name: $("course").selectedOptions[0].textContent};
+  $("delete-course-name").textContent = pendingCourseDelete.name;
+  $("delete-course-status").textContent = "";
+  $("delete-course-dialog").showModal();
+});
+$("delete-course-dialog").addEventListener("cancel", event => { if (courseDeleteBusy) event.preventDefault(); });
+$("delete-course-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!pendingCourseDelete || courseDeleteBusy) return;
+  const {id, name} = pendingCourseDelete;
+  courseDeleteBusy = true;
+  $("delete-course-confirm").disabled = true; $("delete-course-cancel").disabled = true;
+  $("delete-course-status").textContent = "正在清理课程资料和学习记录…";
+  let removed = false;
+  try {
+    await api(`/api/courses/${id}`, {method: "DELETE"});
+    removed = true; $("delete-course-dialog").close();
+    try { if (localStorage.getItem("study-course") === id) localStorage.removeItem("study-course"); } catch {}
+    if (currentCourse === id) {
+      currentCourse = ""; $("course").value = ""; $("course-delete-open").hidden = true;
+      selected.clear(); resetLearning(); resetArtifacts(); $("result").hidden = true;
+      $("files").value = ""; updateFiles();
+      await loadDocuments();
+    }
+    await loadCourses();
+    status(`已删除课程「${name}」及其学习记录。`);
+  } catch (error) {
+    if (removed) status(`课程已删除，但列表刷新失败：${error.message}`, true);
+    else $("delete-course-status").textContent = error.message;
+    if (!removed && currentCourse === id) await loadDocuments().catch(() => {});
+  } finally {
+    courseDeleteBusy = false;
+    $("delete-course-confirm").disabled = false; $("delete-course-cancel").disabled = false;
+  }
+});
+let pendingDocumentDelete = null;
+let documentDeleteBusy = false;
+function openDocumentDelete(doc, courseId) {
+  if (documentDeleteBusy) return;
+  pendingDocumentDelete = {doc, courseId};
+  $("delete-document-name").textContent = doc.name;
+  $("delete-document-status").textContent = "";
+  $("delete-document-confirm").disabled = false;
+  $("delete-document-cancel").disabled = false;
+  $("delete-document-dialog").showModal();
+}
+$("delete-document-dialog").addEventListener("cancel", event => { if (documentDeleteBusy) event.preventDefault(); });
+$("delete-document-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!pendingDocumentDelete || documentDeleteBusy) return;
+  const {doc, courseId} = pendingDocumentDelete;
+  $("delete-document-confirm").disabled = true;
+  $("delete-document-cancel").disabled = true;
+  documentDeleteBusy = true;
+  let removed = false;
+  $("delete-document-status").textContent = "正在删除原文件与索引…";
+  try {
+    await api(`/api/documents/${doc.id}`, {method: "DELETE"});
+    removed = true; $("delete-document-dialog").close();
+    if (currentCourse === courseId) {
+      selected.delete(doc.id); resetLearning(); $("result").hidden = true; resetArtifacts();
+      $("question-list").replaceChildren(element("p", "资料已更新，请重新查题。", "empty"));
+      await Promise.all([loadDocuments(), loadArtifacts(), refreshProgress()]);
+      if (activeView === "learning") await loadLearning();
+      if (activeView === "history") await loadHistory();
+    }
+    status(`已删除 ${doc.name}。`);
+  } catch (error) {
+    if (removed) status(`资料已删除，但列表刷新失败：${error.message}`, true);
+    else $("delete-document-status").textContent = error.message;
+    if (currentCourse === courseId) await loadDocuments().catch(() => {});
+  } finally {
+    documentDeleteBusy = false;
+    $("delete-document-confirm").disabled = false; $("delete-document-cancel").disabled = false;
+  }
+});
 async function refreshProgress() {
   const course = currentCourse, epoch = scopeEpoch;
   if (!course) return;

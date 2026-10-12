@@ -1,8 +1,10 @@
 import hashlib
+import logging
 from pathlib import Path
+from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +14,56 @@ from app.models import Course, Document
 from app.schemas.document import DocumentOut, DocumentType
 
 router = APIRouter(prefix="/api", tags=["documents"])
+logger = logging.getLogger("studyagent")
+
+
+def process_uploaded(state, identifier):
+    try:
+        state.ingestion.process(identifier)
+    except Exception as exc:
+        with state.ingestion.control_lock, state.sessions() as session:
+            doc = session.get(Document, identifier)
+            if doc is not None and doc.status in {"processing", "cancelling"}:
+                cancelled = doc.status == "cancelling" or (
+                    isinstance(exc, AppError) and exc.code == "processing_cancelled"
+                )
+                doc.status, doc.warning = "cancelled" if cancelled else "failed", None
+                doc.error = (
+                    "处理已取消，原文件和已识别页缓存已保留，可重试继续"
+                    if cancelled
+                    else exc.message
+                    if isinstance(exc, AppError)
+                    else "后台处理失败，请重试"
+                )
+                session.commit()
+        logger.warning(
+            "background_ingestion document=%s error=%s",
+            identifier,
+            exc.code if isinstance(exc, AppError) else type(exc).__name__,
+        )
+    finally:
+        state.connection.leave_request()
+
+
+def queue_document(request, identifier, tasks, response):
+    state = request.app.state
+    if state.ingestion.lock.locked():
+        raise AppError("ingestion_busy", "已有资料正在处理，请稍后重试", 409)
+    with state.ingestion.control_lock, state.sessions() as session:
+        doc = session.get(Document, identifier)
+        if doc is None:
+            raise AppError("document_not_found", "资料不存在", 404)
+        if doc.status == "cancelling" or (doc.status in {"deleting", "processing"} and doc.warning):
+            raise AppError("document_busy", "资料正在处理或删除，请稍后再操作", 409)
+        if doc.status == "deleting":
+            raise AppError("document_deleting", "资料正在删除，请重试删除而不是重新索引", 409)
+        doc.status, doc.error, doc.warning = "processing", None, "已接收资料，等待后台解析…"
+        session.commit()
+    # Keep model switching/course deletion guarded beyond the HTTP response.
+    state.connection.enter_request()
+    tasks.add_task(process_uploaded, state, identifier)
+    response.status_code = 202
+    return doc
 
 
 @router.get("/courses/{course_id}/documents", response_model=list[DocumentOut])
@@ -28,12 +80,20 @@ def list_documents(course_id: str, request: Request):
         )
 
 
-@router.post("/courses/{course_id}/documents", response_model=DocumentOut, status_code=201)
+@router.post(
+    "/courses/{course_id}/documents",
+    response_model=DocumentOut,
+    status_code=201,
+    responses={202: {"model": DocumentOut, "description": "已接收资料，后台处理进行中"}},
+)
 def upload_document(
     course_id: str,
     request: Request,
     file: UploadFile = File(...),
     document_type: DocumentType = Form("other"),
+    background_tasks: BackgroundTasks = None,
+    response: Response = None,
+    background: Annotated[bool, Form()] = False,
 ):
     settings = request.app.state.settings
     name = (file.filename or "upload").replace("\\", "/").split("/")[-1][:255]
@@ -80,6 +140,8 @@ def upload_document(
                 ) from exc
             raise
     try:
+        if background:
+            return queue_document(request, identifier, background_tasks, response)
         return request.app.state.ingestion.process(identifier)
     except AppError as exc:
         # 与另一个上传恰好竞争时，已保存的文件应能重试，而非永远 processing。
@@ -91,9 +153,37 @@ def upload_document(
         raise
 
 
-@router.post("/documents/{document_id}/retry", response_model=DocumentOut)
-def retry(document_id: str, request: Request):
+@router.post(
+    "/documents/{document_id}/retry",
+    response_model=DocumentOut,
+    responses={202: {"model": DocumentOut, "description": "后台重试进行中"}},
+)
+def retry(
+    document_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    response: Response,
+    background: bool = False,
+):
+    if background:
+        return queue_document(request, document_id, background_tasks, response)
+    with request.app.state.sessions() as session:
+        doc = session.get(Document, document_id)
+        if doc is not None and (
+            doc.status == "cancelling" or (doc.status == "processing" and doc.warning)
+        ):
+            raise AppError("document_busy", "资料正在处理或停止中，请稍后再重试", 409)
     return request.app.state.ingestion.process(document_id)
+
+
+@router.delete("/documents/{document_id}")
+def delete_document(document_id: str, request: Request):
+    return request.app.state.ingestion.delete(document_id)
+
+
+@router.post("/documents/{document_id}/cancel", response_model=DocumentOut, status_code=202)
+def cancel_processing(document_id: str, request: Request):
+    return request.app.state.ingestion.cancel(document_id)
 
 
 @router.get("/documents/{document_id}/file")
@@ -102,6 +192,8 @@ def download(document_id: str, request: Request):
         doc = session.get(Document, document_id)
         if doc is None:
             raise AppError("document_not_found", "资料不存在", 404)
+        if doc.status == "deleting":
+            raise AppError("document_deleting", "资料已停止使用，正在删除", 409)
         path = Path(doc.storage_path).resolve()
         if not path.is_relative_to((request.app.state.settings.data_dir / "uploads").resolve()):
             raise AppError("invalid_file_path", "资料存储路径异常", 500)

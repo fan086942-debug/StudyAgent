@@ -16,6 +16,10 @@
     $("connection-model").required = apiMode;
     $("connection-key").required = apiMode && !(profile?.has_api_key && profile.base_url === $("connection-url").value.trim().replace(/\/+$/, ""));
     $("connection-save").textContent = apiMode ? "保存并启用 ↗" : "切换为演示模式 ↗";
+    let deepseek = false;
+    try { deepseek = new URL($("connection-url").value.trim()).hostname === "api.deepseek.com"; } catch {}
+    $("connection-model-hint").textContent = deepseek ? "DeepSeek Flash 的 API 模型 ID 为 deepseek-flash，请不要填写 DeepSeek-V4.1-Flash。" : "填写 API 模型 ID，不是官网的展示名称。";
+    $("connection-model").placeholder = deepseek ? "deepseek-flash" : "填写服务商提供的模型 ID";
   }
   function fillProfile(data, prepareApi = false) {
     profile = data;

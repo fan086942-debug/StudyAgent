@@ -57,6 +57,36 @@
 
 极光 / 海盐 / 落日三种配色、侧栏工作区导航、学习概况、原生 SVG 知识轨道。配色、深色主题与课程选择保存在浏览器本地。支持 Ctrl / Cmd + K 快捷操作、Ctrl / Cmd + Enter 提问、拖拽上传、请求耗时反馈、复制回答、答案折叠与任务勾选。动画主要使用 transform / opacity；遵循 prefers-reduced-motion。没有远程字体、外部图片或新增前端框架依赖。
 
+## 资料删除与空初始化
+
+首次访问不自动选择数据库第一门课程，默认展示空资料库与 0 份可用资料；新建课程没有预置上传。用户主动选择的课程保存在浏览器，已有课程数据不会被初始化流程清空。
+
+`DELETE /api/documents/{document_id}` 在确认后删除上传原文件、当前与历史 Embedding 索引、正文分块、试卷、题目与无引用知识点。已有练习、错题、生成记录和对话快照保留。处理中的上传 / 重建 / 试卷解析通过同一组锁阻止删除；文件路径必须匹配当前 uploads 目录与该资料 ID。删除前持久化 `deleting` 状态，跨存储删除失败时停止检索并允许重试，避免缺少原文件或索引的记录仍显示可用。
+
+隔离浏览器验收使用 `python -m scripts.documents_preview` 与 `scripts/browser_documents.cjs`，覆盖已有后台资料时首次空状态、取消保留、确认删除、范围与统计刷新、刷新恢复及手机弹窗。结果见 [资料验收](evaluation-documents-ui.json)。
+
+单文件上传默认上限 **200 MB**，前端提示与校验读取 `/health` 的 `max_upload_mb`，后端流式保存时再次校验；`.env` 的 `MAX_UPLOAD_MB` 可设置 1–200 MB。
+
+课程选择框下方的「删除当前课程」需要二次确认。`DELETE /api/courses/{course_id}` 清理该课程全部原文件、各代检索索引、分块、试卷、题目、知识点、练习、自评错题、生成资料、复习计划和对话历史。其他课程及模型配置保留，删除后回到空选择和空资料库。业务请求正在执行时返回 409；删除过程中阻止新业务请求和模型切换，避免旧任务重新写入课程。清理失败保留课程并可再次删除，已删除的资料不会恢复。仅支持既有本机单 worker 模式。
+
+课程界面验收运行 `scripts/browser_courses.cjs`，使用上述隔离服务；覆盖取消、忙碌重试、手机深色弹窗、确认清理、其他课程保留、空状态及刷新。结果见 [课程验收](evaluation-courses-ui.json)。
+
+## 扫描 PDF OCR
+
+扫描页或仅有少量页眉文字的图片页自动执行本地中英文识别。文字页直接提取，混合 PDF 保留物理页码和引用位置。PDF 渲染使用 [pypdfium2](https://pypdfium2.readthedocs.io/en/stable/python_api.html)，识别使用 [RapidOCR](https://github.com/RapidAI/RapidOCR/tree/v1.4.4/python/rapidocr_onnxruntime)，模型随依赖安装；识别不调用用户的 LLM API，无需额外密钥。
+
+`OCR_ENABLED=true` 默认启用，`OCR_DPI=180` 可设置 96–300。限制每个 PDF 1000 页、总提取文字 200 万字符，每页渲染最长边 2400 像素。识别结果可能含公式、表格或低清文字误差，资料列表会显示核查提示。
+
+网页单份 PDF 上传与资料重试使用后台处理，快速返回后每两秒更新页数进度，关闭页面不影响后台任务。原接口默认同步；上传表单增加 `background=true` 返回 202 与 processing 记录，重试可使用 `?background=true`。处理中资料不参与检索，完成索引后才变为 ready。课程删除与模型切换会等待任务结束。
+
+每页 OCR 结果保存在本机 `data/ocr/{document_id}/page-{number}.json`，按文件摘要、识别设置和缓存版本校验，中断或索引失败后重试复用已识别页；损坏缓存重新识别。资料和课程删除同步清理缓存。服务重启将未完成任务标为失败，由用户主动重试，不自动处理历史文件。
+
+处理中资料提供「取消处理」。`POST /api/documents/{id}/cancel` 返回 202 与 cancelling 状态，在当前 OCR 页 / 解析步骤 / 远程请求结束后停止；不强制打断正在执行的识别推理或网络调用。取消检查覆盖 PDF 页边界、每批 16 个 Embedding 片段及每批 100 个索引写入。最终状态 cancelled，不参与检索，原文件与已完成 OCR 页缓存保留，点击「重试 / 重建」继续。停止完成前不能重试或删除，刷新仍显示当前状态；已经完成或失败的任务不能再次取消。进度和最终提交通过互斥锁协调，避免取消后被旧任务覆盖成 ready。
+
+取消功能用 `tests/test_processing_cancel.py` 与 `scripts/browser_cancel.cjs` 验证排队取消、页内取消、部分索引清理、缓存复用、刷新状态及手机布局，使用合成资料和隔离数据库。
+
+使用 `scripts/make_ocr_fixture.py` 生成合成测试扫描页，`scripts/browser_ocr.cjs` 在独立资料库验证上传、自动更新、检索页码与缓存删除。本次不重新导入或处理用户提供的教材。
+
 ## 前端模型连接
 
 模式按钮与侧栏「模型连接」打开配置面板。填写 Base URL、模型名称与 API Key，测试接口及 Tool Calling，保存后重建完整模型服务组，无需重启。数据库、上传资料及当前 Embedding 索引保持一致；本地字词检索与远程 LLM 可以组合使用。环境中的 Embedding 设置仍需在 `.env` 配置并重启。

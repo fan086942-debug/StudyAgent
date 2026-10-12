@@ -1,0 +1,12 @@
+{
+  "synthetic_scanned_pdf_only": true,
+  "upload_returns_202": true,
+  "local_chinese_english_ocr": true,
+  "progress_visible": true,
+  "reload_resumes_polling": true,
+  "searchable_with_real_page_numbers": true,
+  "mobile_layout": true,
+  "delete_cleans_ocr_cache": true,
+  "user_textbook_imported": false,
+  "javascript_errors": []
+}

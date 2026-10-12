@@ -21,6 +21,8 @@ Copy-Item .env.example .env
 
 前端连接保存在本机 `data/model-connection.json`，密钥不会回传浏览器或写入 localStorage；文件属于忽略的本地数据，未提供密钥加密。保存的连接优先于 `.env` 的 LLM 配置，允许切回离线演示，重启后继续生效。切换 LLM 不改变现有索引：默认仍用字词哈希检索，无需 Embedding API，但它不具备语义检索能力。
 
+DeepSeek 官方接口填写 `https://api.deepseek.com`，Flash 的 API 模型 ID 为 `deepseek-flash`，不是官网展示名 `DeepSeek-V4.1-Flash`。当前适配使用非思考模式，支持连接测试中的强制工具调用和 Agent 后续工具轮次；其他厂商请求不添加该参数。协议依据见 [DeepSeek 接口文档](https://api-docs.deepseek.com/api/create-chat-completion/)。
+
 如需真实语义 Embedding，在本地 `.env` 设置 `STUDY_MODE=api`，分别填写 LLM 与 Embedding 的 `BASE_URL`（包含 `/v1` 等实际前缀）、`API_KEY`、`MODEL`，并设置 Embedding 实际返回维度。修改 Embedding 配置需重启并重新索引；UI 提供重建入口。不同厂商的兼容程度与模型质量需真实验证。
 
 ## 开发验证
@@ -41,7 +43,8 @@ Copy-Item .env.example .env
 | pydantic / pydantic-settings | Schema、配置和环境变量 |
 | sqlalchemy | SQLite ORM、事务 |
 | chromadb | 本地持久化向量索引、metadata 过滤 |
-| pypdf | 文本型 PDF 的逐页提取 |
+| pypdfium2 / rapidocr-onnxruntime | PDF 逐页提取、渲染与本地中英文 OCR |
+| pypdf | PDF 测试样本与密码保护校验 |
 | python-pptx | 幻灯片、表格及备注提取 |
 | python-docx | Word 标题、段落、表格 |
 | httpx | 模型 HTTP 调用；测试 FastAPI 接口 |
@@ -84,6 +87,8 @@ Phase 1 / 2 / 3 / 4 代码已实现，离线单元 / 集成测试及真实浏览
 2. 上传 PDF / PPTX / DOCX，等到资料显示「可检索」。
 3. 输入问题，或勾选资料限定范围。
 4. 对照来源卡片的原文和位置核查回答。
+
+首次进入不自动选中已有课程，资料列表与可用资料计数默认为空；新建课程也不会预置示例资料。选择课程后才加载其已保存内容，返回时可以恢复上次主动选择的课程。每份已上传资料旁提供「删除」，确认后移除原文件、所有版本的向量索引及该试卷题目；已保存的复习资料、错题和对话快照保留。删除中途失败的资料会停止参与检索，点击「删除」可重试。
 
 ### 第四阶段：学习闭环与新版界面
 
@@ -183,9 +188,11 @@ Phase 1 / 2 / 3 / 4 代码已实现，离线单元 / 集成测试及真实浏览
 | `GET /api/courses/{id}/artifacts` | 分页生成历史；子路径 /{artifact_id} 读详情、/{artifact_id}/download 下载 |
 | `GET /health` | 服务状态和模式，不暴露密钥 |
 | `POST /api/courses`、`GET /api/courses` | 创建、列出课程 |
+| `DELETE /api/courses/{id}` | 删除课程、资料索引及全部学习记录 |
 | `POST /api/courses/{id}/documents` | 上传并同步处理，成功返回 201 |
 | `GET /api/courses/{id}/documents` | 资料列表、状态与错误 |
 | `POST /api/documents/{id}/retry` | 失败重试或重新索引 |
+| `POST /api/documents/{id}/cancel` | 停止资料解析 / OCR / 索引，保留原文件及页缓存 |
 | `GET /api/documents/{id}/file` | 原文件，PDF 支持物理页定位 |
 | `POST /api/search` | 检索片段，便于调试 |
 | `POST /api/chat` | 回答、引用、阶段耗时与 usage |
@@ -218,7 +225,9 @@ Phase 1 / 2 / 3 / 4 代码已实现，离线单元 / 集成测试及真实浏览
 
 ## 已知边界
 
-- 文本 PDF 优先；复杂双栏、公式和图片理解、OCR 暂未实现。
+- 单文件上传上限默认 **200 MB**（200 × 1024 × 1024 字节），前后端统一读取 `/health` 的 `max_upload_mb`；`.env` 中 `MAX_UPLOAD_MB` 可设置 1–200 MB。
+- 课程选择框下方的「删除当前课程」需要二次确认，清理该课程全部资料、索引及学习记录；其他课程与模型配置保留。删除后回到空资料库，失败可重试，已清理资料不会恢复。课程删除时阻止业务请求和模型切换，已有任务执行时返回 409。详情见 [Phase 4](docs/phase4.md)。
+- 扫描 PDF 自动执行本地中英文 OCR，混合 PDF 保留原文字层和物理页码；公式、表格、复杂双栏和低清图片的识别仍需人工核查，不提供图像语义理解。
 - DOCX 逐段 / 表格切块，短标题可能形成小片段；后续可按章节合并并保存位置范围。
 - 纯向量检索基线，无 BM25 / Reranker；参数需在自己的课程开发集上调优。
 - 引用 ID 校验与真实位置展示不能证明模型每一句话都被证据支持，需要人工 QA。

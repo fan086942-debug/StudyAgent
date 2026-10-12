@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     embedding_model: str = ""
     embedding_dimensions: int = Field(default=1536, ge=1)
     request_timeout: float = Field(default=60, gt=0)
-    max_upload_mb: int = Field(default=25, ge=1, le=200)
+    max_upload_mb: int = Field(default=200, ge=1, le=200)
+    ocr_enabled: bool = True
+    ocr_dpi: int = Field(default=180, ge=96, le=300)
     chunk_size: int = Field(default=800, ge=100, le=2000)
     chunk_overlap: int = Field(default=120, ge=0)
     retrieval_candidates: int = Field(default=12, ge=1, le=50)

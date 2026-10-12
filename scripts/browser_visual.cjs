@@ -23,6 +23,11 @@ const assert = require('node:assert/strict');
   const ready = async () => {
     await page.goto(process.env.STUDY_URL || 'http://127.0.0.1:8000');
     await page.locator('#mode').filter({hasText: /模式/}).waitFor();
+    if (!await page.locator('#course').inputValue()) {
+      const value = await page.locator('#course').evaluate(select => [...select.options].find(option => option.value)?.value);
+      if (!value) throw new Error('Visual check needs an existing course with uploaded documents.');
+      await page.locator('#course').selectOption(value);
+    }
     await page.locator('#document-count').filter({hasText: /[1-9]/}).waitFor();
   };
   const selectPalette = async palette => {

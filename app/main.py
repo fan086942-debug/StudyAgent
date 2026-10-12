@@ -89,10 +89,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             and request.url.path.startswith("/api/")
             and not request.url.path.startswith("/api/connection")
         )
-        if guarded:
-            connection.enter_request()
+        entered = False
         try:
+            if guarded:
+                connection.enter_request()
+                entered = True
             response = await call_next(request)
+        except AppError as exc:
+            response = JSONResponse(
+                status_code=exc.status,
+                content={
+                    "code": exc.code,
+                    "message": exc.message,
+                    "request_id": request.state.request_id,
+                },
+            )
         except Exception as exc:
             # 仅记录异常类型，避免外部 API 响应或资料原文泄露。
             logger.error("request=%s error=%s", request.state.request_id, type(exc).__name__)
@@ -105,7 +116,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 },
             )
         finally:
-            if guarded:
+            if entered:
                 connection.leave_request()
         response.headers["X-Request-ID"] = request.state.request_id
         logger.info(
@@ -148,6 +159,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "mode": app.state.settings.study_mode,
             "version": "0.4.0",
             "max_upload_mb": settings.max_upload_mb,
+            "ocr_enabled": settings.ocr_enabled,
         }
 
     return app

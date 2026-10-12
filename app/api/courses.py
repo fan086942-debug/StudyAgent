@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app.models import Course
 from app.schemas.document import CourseCreate, CourseOut
+from app.services.courses import delete_course
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 
@@ -20,3 +21,9 @@ def create_course(body: CourseCreate, request: Request):
 def list_courses(request: Request):
     with request.app.state.sessions() as session:
         return list(session.scalars(select(Course).order_by(Course.created_at.desc())))
+
+
+@router.delete("/{course_id}")
+def remove_course(course_id: str, request: Request):
+    with request.app.state.connection.exclusive_task():
+        return delete_course(request.app.state, course_id)

@@ -6,10 +6,10 @@
   <title>StudyAgent · 让知识，连成线。</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%232b6654'/%3E%3Cpath d='M12 12h16v7H16v4h12v5H12v-9h12v-3H12z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/vibrant.css?v=20261010">
-  <script src="/static/app.js" defer></script>
+  <link rel="stylesheet" href="/static/vibrant.css?v=20261012-cancel">
+  <script src="/static/app.js?v=20261012-cancel" defer></script>
   <script src="/static/interactions.js?v=20261010" defer></script>
-  <script src="/static/connection.js?v=20261010" defer></script>
+  <script src="/static/connection.js?v=20261011" defer></script>
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('study-theme')||'light';document.documentElement.dataset.palette=localStorage.getItem('study-palette')||'aurora'}catch{}</script>
 </head>
 <body>
@@ -48,6 +48,7 @@
       <div class="sidebar-divider"></div>
       <div class="list-heading"><h2>课程资料库</h2><span id="document-count" class="count-pill">0</span></div>
       <label class="sr-only" for="course">当前课程</label><select id="course"><option value="">请先创建课程</option></select>
+      <div class="course-actions"><button id="course-delete-open" class="link-button course-delete" type="button" hidden>删除当前课程</button></div>
       <form id="course-form" class="inline"><label class="sr-only" for="course-name">新课程名称</label><input id="course-name" placeholder="创建一门新课程…" maxlength="120" required><button type="submit" class="secondary" aria-label="创建课程">＋</button></form>
       <details class="upload-details" open><summary>添加学习资料 <svg class="icon"><use href="#i-upload"/></svg></summary>
         <form id="upload-form"><label for="document-type">资料类别</label><select id="document-type"><option value="textbook">教材</option><option value="slides">课件</option><option value="notes">复习笔记 / 教师重点</option><option value="exam">试卷 · 自动提取题目</option><option value="other">其他</option></select>
@@ -88,13 +89,25 @@
   </div>
   <dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title"><form method="dialog" class="command-heading"><h2 id="command-title">想从哪里开始？</h2><button class="icon-button" aria-label="关闭快捷操作">×</button></form><label class="sr-only" for="command-search">搜索快捷操作</label><input id="command-search" placeholder="搜索页面或学习任务…" autocomplete="off"><div id="command-results"></div><p class="hint">方向键选择 · Enter 打开 · Esc 关闭</p></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="delete-course-dialog" class="connection-dialog delete-document-dialog" aria-labelledby="delete-course-title" aria-describedby="delete-course-description">
+    <h2 id="delete-course-title">删除这门课程？</h2><p id="delete-course-name" class="delete-document-name"></p>
+    <p id="delete-course-description" class="hint">该课程的全部资料、检索索引、试卷题目、练习记录、错题、复习资料、复习计划和对话记录都会被永久删除，无法恢复。</p>
+    <p id="delete-course-status" class="hint" role="status" aria-live="polite"></p>
+    <div class="connection-actions"><form method="dialog"><button id="delete-course-cancel" class="secondary" autofocus>取消</button></form><form id="delete-course-form"><button id="delete-course-confirm" type="submit" class="danger-button">删除课程</button></form></div>
+  </dialog>
+  <dialog id="delete-document-dialog" class="connection-dialog delete-document-dialog" aria-labelledby="delete-document-title" aria-describedby="delete-document-description">
+    <h2 id="delete-document-title">删除这份资料？</h2><p id="delete-document-name" class="delete-document-name"></p>
+    <p id="delete-document-description" class="hint">原文件、检索索引及该试卷的题目会被永久移除。已保存的复习资料、错题和对话快照仍会保留。</p>
+    <p id="delete-document-status" class="hint" role="status" aria-live="polite"></p>
+    <div class="connection-actions"><form method="dialog"><button id="delete-document-cancel" class="secondary" autofocus>取消</button></form><form id="delete-document-form"><button id="delete-document-confirm" type="submit" class="danger-button">删除资料</button></form></div>
+  </dialog>
   <dialog id="connection-dialog" class="connection-dialog" aria-labelledby="connection-title">
     <form method="dialog" class="command-heading"><div><div class="eyebrow">CONNECT YOUR MODEL</div><h2 id="connection-title">连接你的学习模型</h2></div><button class="icon-button" aria-label="关闭模型连接">×</button></form>
     <p class="hint">使用支持工具调用的 OpenAI 兼容接口。保存后立即生效，无需重启。</p>
     <form id="connection-form" autocomplete="off">
       <label for="connection-mode">运行方式</label><select id="connection-mode"><option value="api">模型 API · 真实模型规划与回答</option><option value="demo">离线演示 · 原文摘录与规则流程</option></select>
       <label for="connection-url">接口根地址 · Base URL</label><input id="connection-url" type="url" maxlength="500" required placeholder="https://你的服务地址/v1"><p class="field-note">填写根地址，不要追加 /chat/completions。</p>
-      <label for="connection-model">模型名称</label><input id="connection-model" maxlength="160" placeholder="填写服务商提供的模型 ID" spellcheck="false">
+      <label for="connection-model">模型名称</label><input id="connection-model" maxlength="160" placeholder="填写服务商提供的模型 ID" spellcheck="false" aria-describedby="connection-model-hint"><p id="connection-model-hint" class="field-note">填写 API 模型 ID，不是官网的展示名称。</p>
       <div class="connection-key-label"><label for="connection-key">API Key</label><label class="check-label"><input id="connection-show-key" type="checkbox"> 显示密钥</label></div><input id="connection-key" type="password" maxlength="4096" autocomplete="new-password" placeholder="填写你的 API Key" spellcheck="false">
       <p id="connection-storage" class="field-note">密钥保存在本机服务端，不会写入浏览器缓存。</p>
       <p id="connection-index" class="connection-index hint">资料检索沿用当前索引。</p>

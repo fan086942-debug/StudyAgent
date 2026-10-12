@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from contextlib import contextmanager
 from threading import Lock
 from uuid import uuid4
 
@@ -52,6 +53,7 @@ class ModelConnection:
         self.state, self.defaults = state, defaults
         self.path = defaults.data_dir / "model-connection.json"
         self.lock, self.active_requests = Lock(), 0
+        self.exclusive_business = False
         self.profile = ConnectionInput(
             mode=defaults.study_mode,
             base_url=defaults.llm_base_url,
@@ -122,11 +124,25 @@ class ModelConnection:
 
     def enter_request(self):
         with self.lock:
+            if self.exclusive_business:
+                raise AppError("course_busy", "正在删除课程，请稍后再操作", 409)
             self.active_requests += 1
 
     def leave_request(self):
         with self.lock:
             self.active_requests -= 1
+
+    @contextmanager
+    def exclusive_task(self):
+        with self.lock:
+            if self.exclusive_business or self.active_requests != 1:
+                raise AppError("course_busy", "当前有任务正在处理，请结束后再删除课程", 409)
+            self.exclusive_business = True
+        try:
+            yield
+        finally:
+            with self.lock:
+                self.exclusive_business = False
 
     def save(self, body):
         profile = self.resolve(body)

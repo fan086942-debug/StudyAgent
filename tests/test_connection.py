@@ -61,15 +61,20 @@ def test_switch_persist_and_retain_index(connected_app, tmp_path):
         assert restarted.get("/api/connection").json()["has_api_key"]
 
 
-def test_connection_and_agent_use_model_http(connected_app):
+@pytest.mark.parametrize("base_url", ["https://model.example/v1", "https://api.deepseek.com"])
+def test_connection_and_agent_use_model_http(connected_app, base_url):
     app, client = connected_app
     calls = []
 
     def provider(request):
-        assert str(request.url) == "https://model.example/v1/chat/completions"
+        assert str(request.url) == base_url + "/chat/completions"
         assert request.headers["authorization"] == "Bearer test-private-key"
         body = json.loads(request.content)
         assert body["model"] == "test-model"
+        if base_url == "https://api.deepseek.com":
+            assert body["thinking"] == {"type": "disabled"}
+        else:
+            assert "thinking" not in body
         calls.append(body)
         if body.get("tool_choice") != "auto":
             message = {
@@ -97,10 +102,11 @@ def test_connection_and_agent_use_model_http(connected_app):
 
     with httpx.Client(transport=httpx.MockTransport(provider)) as http:
         app.state.http = http
-        assert client.post("/api/connection/test", json=profile()).json()["status"] == "ok"
+        connection = {**profile(), "base_url": base_url}
+        assert client.post("/api/connection/test", json=connection).json()["status"] == "ok"
         assert client.get("/health").json()["mode"] == "demo"
         assert not app.state.connection.path.exists()
-        assert client.put("/api/connection", json=profile()).status_code == 200
+        assert client.put("/api/connection", json=connection).status_code == 200
         course = client.post("/api/courses", json={"name": "API 连接验收"}).json()
         result = client.post(
             "/api/agent", json={"course_id": course["id"], "question": "查看学习进度"}

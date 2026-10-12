@@ -8,21 +8,39 @@ from app.rag.parsers.pptx import parse_pptx
 from app.schemas.document import ParsedDocument
 
 
-def parse_document(path: Path) -> ParsedDocument:
+def parse_document(
+    path: Path, *, settings=None, cache_dir=None, digest=None, progress=None, cancel=None
+) -> ParsedDocument:
     parsers = {".pdf": parse_pdf, ".pptx": parse_pptx, ".docx": parse_docx}
     parser = parsers.get(path.suffix.lower())
     if parser is None:
         raise AppError("unsupported_type", "仅支持文本 PDF、PPTX、DOCX；旧格式请先转换")
     try:
+        if cancel:
+            cancel()
         if path.suffix.lower() != ".pdf":
             # OOXML 是 ZIP 容器，先限制解压量，避免小文件包含异常大数据。
             with ZipFile(path) as archive:
                 if sum(item.file_size for item in archive.infolist()) > 200 * 1024 * 1024:
                     raise AppError("document_too_large", "文档解压后超过 200MB，请拆分上传")
-        result = parser(path)
+        result = (
+            parse_pdf(
+                path,
+                ocr_enabled=settings.ocr_enabled if settings else True,
+                ocr_dpi=settings.ocr_dpi if settings else 180,
+                cache_dir=cache_dir,
+                digest=digest,
+                progress=progress,
+                cancel=cancel,
+            )
+            if path.suffix.lower() == ".pdf"
+            else parser(path)
+        )
+        if cancel:
+            cancel()
         result.blocks = [block for block in result.blocks if block.text.strip()]
         if not result.blocks:
-            raise AppError("no_text", "没有可提取文本；扫描 PDF 或图片资料需要 OCR")
+            raise AppError("no_text", "没有可索引文字；请检查是否为空白页、低清图片或 OCR 已关闭")
         if sum(len(block.text) for block in result.blocks) > 2_000_000:
             raise AppError("document_too_large", "提取文字超过 200 万字符，请拆分资料")
         return result

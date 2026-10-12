@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import ValidationError
@@ -12,6 +13,12 @@ logger = logging.getLogger("studyagent")
 
 
 def post_json(client: httpx.Client, url: str, key: str, payload: dict) -> dict:
+    if urlsplit(url).hostname == "api.deepseek.com" and urlsplit(url).path.rstrip("/").endswith(
+        "/chat/completions"
+    ):
+        # DeepSeek defaults to thinking, which rejects named tool_choice and needs
+        # reasoning_content replay. Our bounded, structured Agent uses non-thinking.
+        payload = {"thinking": {"type": "disabled"}, **payload}
     for attempt in range(2):
         try:
             response = client.post(url, headers={"Authorization": f"Bearer {key}"}, json=payload)
@@ -25,9 +32,18 @@ def post_json(client: httpx.Client, url: str, key: str, payload: dict) -> dict:
         except httpx.TimeoutException as exc:
             raise AppError("provider_timeout", "模型服务超时，请稍后重试", 504) from exc
         except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            hint = {
+                400: "请求参数不兼容，请检查 API 模型 ID（不是官网展示名）与接口协议",
+                401: "密钥无效或不属于当前服务，请检查 API Key 与接口地址",
+                402: "模型账户余额不足，请检查服务商的 API 余额",
+                403: "当前密钥没有访问权限，请检查服务商授权",
+                404: "接口路径或模型不存在，请检查 Base URL 与模型 ID",
+                429: "请求限流或配额不足，请稍后重试并检查服务商配额",
+            }.get(status, "请检查模型、密钥、配额和上下文长度")
             raise AppError(
                 "provider_http_error",
-                f"模型服务返回 HTTP {exc.response.status_code}，请检查模型、密钥、配额和上下文长度",
+                f"模型服务返回 HTTP {status}：{hint}",
                 502,
             ) from exc
         except httpx.RequestError as exc:
