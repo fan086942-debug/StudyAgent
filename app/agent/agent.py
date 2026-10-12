@@ -3,6 +3,7 @@ import logging
 import time
 from uuid import uuid4
 
+from app.agent.intents import relation_intent, study_intent
 from app.agent.planner import AGENT_PROMPT
 from app.agent.tools import TOOL_SPECS, ToolContext, valid_answer
 from app.core.errors import AppError
@@ -20,6 +21,64 @@ class StudyAgent:
         self.registry.exams.validate_scope(request.course_id, request.document_ids)
         start, run_id = time.perf_counter(), uuid4().hex
         context = ToolContext(request)
+        intent = relation_intent(request.question)
+        tool = "match_material_questions" if intent is not None else "generate_study_pack"
+        if intent is None:
+            intent = study_intent(request.question)
+        if intent is not None:
+            begun = time.perf_counter()
+            try:
+                result = self.registry.execute(
+                    tool, json.dumps(intent, ensure_ascii=False), context
+                )
+                trace = [
+                    ToolTrace(
+                        step=1,
+                        tool=tool,
+                        purpose=TOOL_SPECS[tool][1],
+                        arguments=intent,
+                        status="ok",
+                        observation={
+                            "artifacts": len(result.artifacts),
+                            "chapters_or_sections": len(
+                                result.learning.get("study_coverage", {}).get("units", [])
+                            ),
+                            "material_question_links": len(
+                                result.learning.get("material_question_links", [])
+                            ),
+                        },
+                        elapsed_ms=(time.perf_counter() - begun) * 1000,
+                    )
+                ]
+                return self._finish(
+                    context, trace, result.usage, None, "completed", result.warning, start
+                )
+            except AppError as exc:
+                return AgentResponse(
+                    answer=exc.message,
+                    sources=[],
+                    questions=[],
+                    artifacts=[],
+                    plans=[],
+                    learning={},
+                    trace=[
+                        ToolTrace(
+                            step=1,
+                            tool=tool,
+                            purpose=TOOL_SPECS[tool][1],
+                            arguments=intent,
+                            status="error",
+                            observation={"error": {"code": exc.code, "message": exc.message}},
+                            elapsed_ms=(time.perf_counter() - begun) * 1000,
+                        )
+                    ],
+                    mode=self.settings.study_mode,
+                    insufficient_evidence=True,
+                    finish_reason="study_failed",
+                    warning=exc.message,
+                    usage={},
+                    total_ms=(time.perf_counter() - start) * 1000,
+                )
         messages = [
             {"role": "system", "content": AGENT_PROMPT},
             {"role": "user", "content": request.question},
@@ -145,12 +204,18 @@ class StudyAgent:
     def _finish(self, context, trace, usage, final, reason, warning, start) -> AgentResponse:
         sources = list(context.sources.values())
         questions = list(context.questions.values())
-        answer, insufficient = "当前资料中未找到可靠来源。请补充资料或明确试卷和题号。", True
+        answer, insufficient = (
+            "当前资料范围没有检索到足够依据，请确认资料已完成处理，或明确需要学习的内容。",
+            True,
+        )
         if context.learning_answer:
             answer, insufficient = context.learning_answer, False
         elif context.artifacts:
             answer = "已生成并保存：" + "、".join(a.title for a in context.artifacts.values())
             answer += "。可从下方入口预览、练习和下载。"
+            if context.learning.get("study_coverage"):
+                coverage = context.learning["study_coverage"]
+                answer += f"已分段读取 {coverage['read_chunks']} 个正文片段，整理 {len(coverage['units'])} 个章节/小节。"
             insufficient = False
             if self.settings.study_mode == "demo":
                 answer += "演示模式未调用 LLM，内容为原文整理与摘录模板。"
@@ -185,6 +250,14 @@ class StudyAgent:
                 answer = "已找到候选试题，请在下方选择具体题目进行分析。"
         if reason in {"step_limit", "context_limit", "provider_error"}:
             insufficient = True
+        if reason == "provider_error" and not context.artifacts:
+            answer = (
+                "已检索到资料，但模型响应发生错误，本次未完成回答。"
+                if sources
+                else "模型服务未能完成这次请求。"
+            )
+            if warning:
+                answer += warning
         return AgentResponse(
             learning=context.learning,
             plans=list(context.plans.values()),

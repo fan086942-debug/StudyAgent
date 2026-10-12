@@ -4,7 +4,8 @@ from sqlalchemy import select
 
 from app.core.errors import AppError
 from app.models import Course, Document, DocumentChunk
-from app.schemas.chat import SearchRequest, SearchResponse, Source
+from app.rag.sources import chunk_source
+from app.schemas.chat import SearchRequest, SearchResponse
 
 
 class Retriever:
@@ -37,7 +38,7 @@ class Retriever:
                 vector, request.course_id, ready, self.settings.retrieval_candidates
             )
             sources, seen, budget = [], set(), self.settings.context_char_budget
-            #阈值过滤
+            # Apply the similarity threshold before including a source in the context budget.
             for chunk_id, distance in hits:
                 score = 1 - float(distance)
                 if score < self.settings.min_similarity:
@@ -63,24 +64,7 @@ class Retriever:
                     break
                 text = chunk.text[:budget]
                 sources.append(
-                    Source(
-                        citation_id=f"S{len(sources) + 1}",
-                        chunk_id=chunk.id,
-                        course_id=request.course_id,
-                        document_id=doc.id,
-                        document_name=doc.name,
-                        document_type=doc.document_type,
-                        file_type=doc.file_type,
-                        score=round(score, 5),
-                        text=text,
-                        page=chunk.page,
-                        chapter=chunk.chapter,
-                        section=chunk.section,
-                        block_index=chunk.block_index,
-                        location_type=chunk.location_type,
-                        file_url=f"/api/documents/{doc.id}/file"
-                        + (f"#page={chunk.page}" if doc.file_type == "pdf" else ""),
-                    )
+                    chunk_source(chunk, doc, f"S{len(sources) + 1}", score=score, text=text)
                 )
                 seen.add(key)
                 budget -= len(text)

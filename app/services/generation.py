@@ -122,7 +122,7 @@ class GenerationService:
             return self._out(row)
 
     @staticmethod
-    def _validate(request, content, topic_ids):
+    def _validate(request, content, topic_ids, allowed_headings=()):
         if content.insufficient_evidence:
             raise AppError(
                 "generation_no_evidence", "当前资料不足以生成符合要求的内容，请补充资料", 409
@@ -146,7 +146,9 @@ class GenerationService:
                 if item.type != request.question_type or item.difficulty != request.difficulty:
                     invalid = True
             # 引用和位置由服务端渲染；禁止正文夹带另一套来源编号或编造页码。
-            text = str(item.model_dump(exclude={"citation_ids"}))
+            text = str(item.model_dump(exclude={"citation_ids", "topic"}))
+            for heading in allowed_headings:
+                text = text.replace(heading, "")
             if re.search(r"\[S\d+\]|第\s*[\d一二三四五六七八九十百]+\s*[页章]", text):
                 invalid = True
         stems = [re.sub(r"\s+", "", q.stem) for q in content.questions]
@@ -160,9 +162,15 @@ class GenerationService:
             )
 
     @staticmethod
-    def _demo(request, sources, topic_ids):
+    def _demo(request, sources, topic_ids, excluded=()):
         lookup = {s.citation_id: s for s in sources}
         if request.kind == "review":
+            selected = {
+                topic: ids
+                if len(ids) <= 8
+                else [ids[round(i * (len(ids) - 1) / 7)] for i in range(8)]
+                for topic, ids in topic_ids.items()
+            }
             return GeneratedContent(
                 title="复习资料 · 原文摘录",
                 sections=[
@@ -172,7 +180,7 @@ class GenerationService:
                         key_points=[lookup[c].text for c in ids],
                         citation_ids=ids,
                     )
-                    for topic, ids in topic_ids.items()
+                    for topic, ids in selected.items()
                 ],
             )
         # 离线模式不假装推理解题，只用不同原文片段构造可核对的摘录练习。
@@ -186,7 +194,7 @@ class GenerationService:
                         pool.append((text, citation))
                         seen.add(text)
             pools[topic] = pool
-        questions, used = [], set()
+        questions, used = [], set(excluded)
         for index in range(request.question_count):
             topic = request.topics[index % len(request.topics)]
             candidate = next((p for p in pools[topic] if p[0] not in used), None)
@@ -263,7 +271,7 @@ def artifact_markdown(artifact, include_answers=True):
         f"生成时间：{artifact.created_at}",
         "",
     ]
-    for section in content.sections:
+    for section in content.sections if include_answers or not content.questions else []:
         lines += [f"## {section.topic}", "", section.summary, ""]
         lines += [f"- {p}" for p in section.key_points]
         if section.pitfalls:

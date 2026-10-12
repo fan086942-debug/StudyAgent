@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import Response
 
-from app.schemas.generation import ArtifactOut, ArtifactSummary, GenerationRequest
+from app.schemas.generation import ArtifactOut, ArtifactSummary, GenerationRequest, StudyPackRequest
 from app.services.generation import artifact_markdown
+from app.services.material_study import generate_study_pack
 
 router = APIRouter(prefix="/api", tags=["generation"])
 
@@ -10,6 +11,11 @@ router = APIRouter(prefix="/api", tags=["generation"])
 @router.post("/generate", response_model=ArtifactOut, status_code=201)
 def generate(body: GenerationRequest, request: Request):
     return request.app.state.generation.generate(body)
+
+
+@router.post("/study", response_model=ArtifactOut, status_code=201)
+def study(body: StudyPackRequest, request: Request):
+    return generate_study_pack(request.app.state.generation, body)
 
 
 @router.get("/courses/{course_id}/artifacts", response_model=list[ArtifactSummary])

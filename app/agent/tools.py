@@ -4,15 +4,32 @@ from dataclasses import dataclass, field
 from pydantic import ValidationError
 from sqlalchemy import select
 
+from app.agent.intents import study_intent
 from app.core.errors import AppError
 from app.models import Document
 from app.schemas.agent import KnowledgeArgs, QuestionArgs, ToolResult
 from app.schemas.chat import SearchRequest, Source
 from app.schemas.exam import QuestionSearch
-from app.schemas.generation import ArtifactSummary, GenerationArgs, GenerationRequest
+from app.schemas.generation import (
+    ArtifactSummary,
+    GenerationArgs,
+    GenerationRequest,
+    StudyPackArgs,
+    StudyPackRequest,
+)
 from app.schemas.learning import LearningArgs, PlanArgs, WrongListArgs
+from app.schemas.material_learning import RelationArgs, RelationRequest
+from app.services.material_study import generate_study_pack
 
 TOOL_SPECS = {
+    "match_material_questions": (
+        RelationArgs,
+        "双向匹配教材/课件/笔记与已解析试卷题目。material_to_exam 从资料找题；exam_to_material 从试题找资料。返回真实来源、匹配知识点及候选关联，不生成答案。query 可用知识点，留空按整个范围匹配。",
+    ),
+    "generate_study_pack": (
+        StudyPackArgs,
+        "根据已选整份资料识别章节/小节，分段读取全部可用正文，整理各章重点、核心知识点和易错点，并按章节蓝图生成复习卷。无需用户先给出 topics；仅在用户明确要求整份资料学习或复习卷时使用。",
+    ),
     "get_learning_progress": (
         LearningArgs,
         "读取真实练习次数、自评正确率、错题与薄弱知识点，不推断能力。",
@@ -75,10 +92,21 @@ class ToolContext:
 
 
 class ToolRegistry:
-    def __init__(self, settings, sessions, retriever, exams, llm, generation=None, learning=None):
+    def __init__(
+        self,
+        settings,
+        sessions,
+        retriever,
+        exams,
+        llm,
+        generation=None,
+        learning=None,
+        material_learning=None,
+    ):
         self.settings, self.sessions, self.retriever = settings, sessions, retriever
         self.exams, self.llm = exams, llm
         self.generation, self.learning = generation, learning
+        self.material_learning = material_learning
 
     @staticmethod
     def schemas() -> list[dict]:
@@ -106,6 +134,52 @@ class ToolRegistry:
             ) from exc
         # 课程和资料范围来自用户请求，由服务端注入；模型无权自行扩大检索范围。
         request = context.request
+        if name == "match_material_questions":
+            result = self.material_learning.relations(
+                request.course_id,
+                RelationRequest(
+                    **args.model_dump(),
+                    document_ids=request.document_ids,
+                    exam_document_ids=request.document_ids,
+                ),
+            )
+            for question in result.questions:
+                context.questions[question.id] = question
+            context.learning["material_question_links"] = [
+                link.model_dump() for link in result.links
+            ]
+            context.learning_answer = result.answer
+            return ToolResult(
+                answer=result.answer,
+                sources=context.cite(result.sources),
+                questions=result.questions,
+                learning=context.learning,
+                warning=result.warning,
+            )
+        if name == "generate_study_pack":
+            if study_intent(request.question) is None:
+                raise AppError("generation_not_requested", "用户尚未要求生成整份资料学习包")
+            artifact = generate_study_pack(
+                self.generation,
+                StudyPackRequest(
+                    **args.model_dump(),
+                    course_id=request.course_id,
+                    document_ids=request.document_ids,
+                ),
+            )
+            summary = ArtifactSummary.model_validate(artifact.model_dump())
+            context.artifacts[artifact.id] = summary
+            context.learning["study_coverage"] = artifact.coverage
+            return ToolResult(
+                artifacts=[summary],
+                sources=context.cite(artifact.sources),
+                learning=context.learning,
+                answer="已保存知识点总结"
+                + ("与复习卷" if artifact.content.questions else "")
+                + "，可预览和下载。",
+                warning=artifact.warning,
+                usage=artifact.usage,
+            )
         if name in {"get_learning_progress", "list_wrong_questions", "create_study_plan"}:
             if name == "get_learning_progress":
                 data = self.learning.progress(request)
@@ -213,17 +287,30 @@ class ToolRegistry:
         )
 
     def _analyze(self, question, sources: list[Source], context: ToolContext) -> ToolResult:
-        query = " ".join(question.knowledge_points) or question.content[:1500]
-        evidence = self._knowledge(query[:2000], context)
-        related = (
-            self.exams.search(
+        matched = self.material_learning.relations(
+            context.request.course_id,
+            RelationRequest(
+                direction="exam_to_material",
+                question_id=question.id,
+                document_ids=context.request.document_ids,
+                exam_document_ids=context.request.document_ids,
+            ),
+        )
+        evidence = context.cite(matched.sources)
+        if not evidence:
+            # Semantic retrieval is a fallback, rather than requiring every label in one query.
+            for query in question.knowledge_points or [question.content[:1500]]:
+                evidence.extend(self._knowledge(query[:2000], context))
+            evidence = list({s.chunk_id: s for s in evidence}.values())[:6]
+        related_by_id = {}
+        for point in question.knowledge_points:
+            for item in self.exams.search(
                 context.request.course_id,
                 context.request.document_ids,
-                QuestionSearch(query=" ".join(question.knowledge_points), limit=6),
-            )
-            if question.knowledge_points
-            else []
-        )
+                QuestionSearch(knowledge_point=point, limit=6),
+            ):
+                related_by_id[item.id] = item
+        related = list(related_by_id.values())
         related = [q for q in related if q.id != question.id][:5]
         for item in related:
             context.questions[item.id] = item

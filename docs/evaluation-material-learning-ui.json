@@ -1,0 +1,18 @@
+{
+  "formats": [
+    "pdf",
+    "pptx",
+    "docx"
+  ],
+  "ppt_summary": true,
+  "summary_only": true,
+  "saved_knowledge_overview": true,
+  "material_to_exam": true,
+  "exam_to_material": true,
+  "selected_material_scope": true,
+  "real_position_visible": true,
+  "practice_navigation": true,
+  "mobile_no_overflow": true,
+  "reduced_motion": true,
+  "javascript_errors": []
+}

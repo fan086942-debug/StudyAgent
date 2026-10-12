@@ -3,6 +3,7 @@ from pathlib import Path
 from docx import Document
 from docx.table import Table
 
+from app.rag.parsers.headings import heading_level
 from app.schemas.document import ParsedDocument, TextBlock
 
 
@@ -32,8 +33,10 @@ def parse_docx(path: Path) -> ParsedDocument:
         else:
             text, kind = item.text, "paragraph"
             style = item.style.name if item.style else ""
+            level = heading_level(text)
             if style.startswith("Heading ") and style.split()[-1].isdigit():
                 level = int(style.split()[-1])
+            if level is not None:
                 headings = {k: v for k, v in headings.items() if k < level}
                 headings[level] = text
         blocks.append(

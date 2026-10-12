@@ -6,8 +6,8 @@
   <title>StudyAgent · 让知识，连成线。</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%232b6654'/%3E%3Cpath d='M12 12h16v7H16v4h12v5H12v-9h12v-3H12z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/vibrant.css?v=20261012-cancel">
-  <script src="/static/app.js?v=20261012-cancel" defer></script>
+  <link rel="stylesheet" href="/static/vibrant.css?v=20261012-learning">
+  <script src="/static/app.js?v=20261012-learning" defer></script>
   <script src="/static/interactions.js?v=20261010" defer></script>
   <script src="/static/connection.js?v=20261011" defer></script>
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('study-theme')||'light';document.documentElement.dataset.palette=localStorage.getItem('study-palette')||'aurora'}catch{}</script>
@@ -89,6 +89,10 @@
   </div>
   <dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title"><form method="dialog" class="command-heading"><h2 id="command-title">想从哪里开始？</h2><button class="icon-button" aria-label="关闭快捷操作">×</button></form><label class="sr-only" for="command-search">搜索快捷操作</label><input id="command-search" placeholder="搜索页面或学习任务…" autocomplete="off"><div id="command-results"></div><p class="hint">方向键选择 · Enter 打开 · Esc 关闭</p></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="relation-dialog" class="connection-dialog relation-dialog" aria-labelledby="relation-title" aria-describedby="relation-description">
+    <form method="dialog" class="command-heading"><h2 id="relation-title">知识与试题的联系</h2><button class="icon-button" aria-label="关闭学习关联">×</button></form>
+    <p id="relation-description" class="hint"></p><div id="relation-content" aria-live="polite"></div>
+  </dialog>
   <dialog id="delete-course-dialog" class="connection-dialog delete-document-dialog" aria-labelledby="delete-course-title" aria-describedby="delete-course-description">
     <h2 id="delete-course-title">删除这门课程？</h2><p id="delete-course-name" class="delete-document-name"></p>
     <p id="delete-course-description" class="hint">该课程的全部资料、检索索引、试卷题目、练习记录、错题、复习资料、复习计划和对话记录都会被永久删除，无法恢复。</p>

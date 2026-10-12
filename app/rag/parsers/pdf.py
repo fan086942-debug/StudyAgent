@@ -1,9 +1,9 @@
-import re
 from pathlib import Path
 
 import pypdfium2 as pdfium
 
 from app.core.errors import AppError
+from app.rag.parsers.headings import heading_level
 from app.rag.parsers.ocr import PageOCR, pdfium_lock
 from app.schemas.document import ParsedDocument, TextBlock
 
@@ -65,7 +65,7 @@ def parse_pdf(
                     if total_chars > 2_000_000:
                         raise AppError("document_too_large", "提取文字超过 200 万字符，请拆分资料")
                     for line in text.splitlines()[:5]:
-                        if re.match(r"^\s*第[一二三四五六七八九十百\d]+章", line):
+                        if heading_level(line) == 1:
                             chapter = line.strip()[:200]
                             break
                     blocks.append(

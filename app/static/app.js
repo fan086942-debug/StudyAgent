@@ -3,6 +3,7 @@ const selected = new Set();
 let currentCourse = "";
 let maxUploadMb = 200;
 let documentRefreshTimer = null;
+let libraryDocuments = [];
 
 function status(message, error = false) {
   $("status").textContent = message;
@@ -53,6 +54,7 @@ async function loadDocuments() {
   clearTimeout(documentRefreshTimer);
   const courseId = currentCourse;
   if (!courseId) {
+    libraryDocuments = [];
     $("upload-button").disabled = false;
     selected.clear(); $("document-count").textContent = "0"; updateScope();
     $("documents").replaceChildren(element("p", "资料库是空的。创建或选择一门课程，上传你的第一份资料。", "empty"));
@@ -64,6 +66,7 @@ async function loadDocuments() {
   }
   const epoch = scopeEpoch;
   const documents = await api(`/api/courses/${courseId}/documents`);
+  if (courseId === currentCourse && epoch === scopeEpoch) libraryDocuments = documents;
   if (courseId !== currentCourse || epoch !== scopeEpoch) return;
   const processing = documents.some(doc => ["processing", "cancelling"].includes(doc.status));
   const pendingIds = documents.filter(doc => ["processing", "cancelling"].includes(doc.status)).map(doc => doc.id);
@@ -97,6 +100,13 @@ async function loadDocuments() {
     label.append(element("small", `${names[doc.status] || doc.status} · ${doc.chunk_count} 个片段`));
     if (doc.error || doc.warning) label.append(element("small", doc.error || doc.warning, ["processing", "cancelling", "cancelled"].includes(doc.status) ? "doc-progress" : "doc-error"));
     const actions = element("div", undefined, "document-actions");
+    if (doc.status === "ready" && doc.document_type !== "exam") {
+      const learn = element("button", "总结知识点", "link-button"); learn.type = "button";
+      learn.addEventListener("click", () => summarizeMaterial(doc, learn));
+      const match = element("button", "找关联试题", "link-button"); match.type = "button";
+      match.addEventListener("click", () => openRelations({material_id: doc.id}, match));
+      actions.append(learn, match);
+    }
     if (["processing", "cancelling"].includes(doc.status)) {
       const cancel = element("button", doc.status === "cancelling" ? "正在停止…" : "取消处理", "link-button document-cancel"); cancel.type = "button";
       cancel.disabled = doc.status === "cancelling"; cancel.setAttribute("aria-label", `取消处理：${doc.name}`);
@@ -220,13 +230,7 @@ function renderResult(result) {
     renderQuestions(result.questions || [], $("matched-questions"));
     $("sources").replaceChildren();
     for (const source of result.sources) {
-      const card = element("article", undefined, "source");
-      const link = element("a", `[${source.citation_id}] ${source.document_name}`);
-      link.href = source.file_url; link.target = "_blank"; link.rel = "noopener";
-      const location = source.location_type === "pdf_page" ? `PDF 物理第 ${source.page} 页` :
-        source.location_type === "slide" ? `第 ${source.page} 张幻灯片` : `文档第 ${source.block_index} 个段落 / 表格块`;
-      card.append(link, element("small", location + (source.section ? ` · ${source.section}` : "")), element("p", source.text));
-      $("sources").append(card);
+      $("sources").append(sourceCard(source));
     }
     if (!result.sources.length) $("sources").append(element("p", "没有可展示的可靠引用。可补充资料或换一种问法。", "empty"));
     $("result").hidden = false; $("welcome").hidden = true; status("处理完成。");
@@ -273,6 +277,8 @@ function renderQuestions(questions, target) {
     link.href = question.file_url; link.target = "_blank"; link.rel = "noopener";
     card.append(link, element("p", question.content, "question-text"));
     card.append(element("p", `${types[question.type]} · 分值 ${question.score ?? "未标注"} · 难度 ${difficulties[question.difficulty]} · 知识点：${question.knowledge_points.join("、") || "未标注"}`, "hint"));
+    const locate = element("button", "定位教材 / 课件依据", "secondary"); locate.type = "button";
+    locate.addEventListener("click", () => openRelations({direction: "exam_to_material", question_id: question.id, exam_document_ids: [question.document_id]}, locate));
     const button = element("button", "查看资料并分析此题", "secondary"); button.type = "button";
     button.addEventListener("click", async () => {
       const courseId = currentCourse;
@@ -288,7 +294,7 @@ function renderQuestions(questions, target) {
       } catch (error) { status(error.message, true); }
       finally { button.disabled = false; }
     });
-    card.append(button, practiceWidget({reference_type: "question", reference_id: question.id})); target.append(card);
+    card.append(locate, button, practiceWidget({reference_type: "question", reference_id: question.id})); target.append(card);
   }
 }
 
@@ -373,8 +379,11 @@ function renderArtifact(artifact) {
     $("artifact-downloads").append(link);
   };
   download("下载完整 Markdown", true);
-  if (artifact.kind === "mock_exam") download("下载题目卷（不附答案）", false);
+  if (artifact.content.questions.length) download("下载题目卷（不附答案）", false);
   const target = $("artifact-content"); target.replaceChildren();
+  if (artifact.coverage?.units) {
+    target.append(element("p", `本次覆盖 ${artifact.coverage.documents.length} 份资料 · ${artifact.coverage.units.length} 个章节/小节 · 分段读取 ${artifact.coverage.read_chunks} 个正文片段。`, "scope-summary"));
+  }
   const refs = (ids) => element("p", "依据：" + ids.map(id => `[${id}]`).join(" "), "hint");
   for (const section of artifact.content.sections) {
     const card = element("article", undefined, "question-item");
@@ -388,7 +397,12 @@ function renderArtifact(artifact) {
       for (const point of section.pitfalls) pitfalls.append(element("li", point));
       card.append(pitfalls);
     }
-    card.append(refs(section.citation_ids)); target.append(card);
+    card.append(refs(section.citation_ids));
+    const match = element("button", "这些知识点有哪些历史题？", "secondary"); match.type = "button";
+    const chunks = artifact.sources.filter(s => section.citation_ids.includes(s.citation_id) && s.document_type !== "exam").map(s => s.chunk_id);
+    match.disabled = !chunks.length;
+    match.addEventListener("click", () => openRelations({chunk_ids: chunks, artifact_id: artifact.id}, match));
+    card.append(match); target.append(card);
   }
   const types = {choice: "选择题", short_answer: "简答题", calculation: "计算题"};
   for (const [index, question] of artifact.content.questions.entries()) {
@@ -397,22 +411,36 @@ function renderArtifact(artifact) {
     question.options.forEach((option, i) => card.append(element("p", `${"ABCD"[i]}. ${option}`)));
     const details = element("details");
     details.append(element("summary", "查看参考答案与解析"), element("p", question.answer, "question-text"), element("p", question.explanation, "question-text"), refs(question.citation_ids));
-    card.append(details, practiceWidget({reference_type: "artifact", reference_id: artifact.id, question_index: index}, artifact.course_id)); target.append(card);
+    const evidence = element("button", "查看这题的教材 / 课件依据", "secondary"); evidence.type = "button";
+    evidence.addEventListener("click", () => {
+      relationEpoch += 1;
+      $("relation-title").textContent = `第 ${index + 1} 题 · 从练习回到资料`;
+      $("relation-description").textContent = "本题生成时保存的依据原文，可对照知识点和参考解析阅读。";
+      $("relation-content").replaceChildren(...artifact.sources.filter(s => question.citation_ids.includes(s.citation_id)).map(sourceCard));
+      if (!$("relation-dialog").open) $("relation-dialog").showModal();
+    });
+    card.append(details, evidence, practiceWidget({reference_type: "artifact", reference_id: artifact.id, question_index: index}, artifact.course_id)); target.append(card);
   }
   $("artifact-sources").replaceChildren();
   for (const source of artifact.sources) {
-    const card = element("article", undefined, "source");
-    const link = element("a", `[${source.citation_id}] ${source.document_name}`);
-    link.href = source.file_url; link.target = "_blank"; link.rel = "noopener";
-    const location = source.location_type === "pdf_page" ? `PDF 物理第 ${source.page} 页` :
-      source.location_type === "slide" ? `第 ${source.page} 张幻灯片` : `第 ${source.block_index} 个段落 / 表格块`;
-    card.append(link, element("small", location), element("p", source.text));
-    $("artifact-sources").append(card);
+    $("artifact-sources").append(sourceCard(source));
   }
   $("artifact-preview").hidden = false;
 }
+const studyPackOption = element("option", "整份资料学习包 · 分章重点与复习卷"); studyPackOption.value = "study_pack"; $("generation-kind").append(studyPackOption);
+const summaryOption = element("option", "整份资料 · 提取与总结知识点"); summaryOption.value = "material_summary"; $("generation-kind").append(summaryOption);
 $("generation-kind").addEventListener("change", () => {
-  $("exam-options").hidden = $("generation-kind").value !== "mock_exam";
+  const summary = $("generation-kind").value === "material_summary";
+  const pack = summary || $("generation-kind").value === "study_pack";
+  $("exam-options").hidden = summary || $("generation-kind").value === "review";
+  $("generation-topics").required = !pack;
+  $("generation-topics").parentElement.hidden = pack;
+  $("generation-count").max = pack ? "64" : "12";
+  $("generation-count").required = !pack;
+  $("generation-count").value = pack ? "" : "3";
+  $("generation-count").placeholder = pack ? "自动分配，每节至少一道" : "";
+  document.querySelector('label[for="generation-count"]').textContent = pack ? "题目数量 · 留空按章节分配" : "题目数量 · 1–12";
+  document.querySelector('#generation-form > p.hint').textContent = pack ? "沿用左侧资料范围。支持 PDF、PPTX、DOCX，逐段读取正文，自动整理知识点、总结和易错点；学习包同时生成复习卷。" : "沿用左侧资料范围。用逗号分隔主题，每个主题都需要可检索的教材、课件或笔记。";
 });
 $("generation-form").addEventListener("submit", async event => {
   event.preventDefault();
@@ -424,11 +452,14 @@ $("generation-form").addEventListener("submit", async event => {
     question_count: Number($("generation-count").value),
     question_type: $("generation-type").value, difficulty: $("generation-difficulty").value
   };
+  const summary = body.kind === "material_summary";
+  const pack = summary || body.kind === "study_pack";
+  if (pack) { body.kind = "study_pack"; body.include_questions = !summary; delete body.topics; body.question_count = $("generation-count").value ? Number($("generation-count").value) : null; }
   if (selected.size) body.document_ids = [...selected];
   $("generate-button").disabled = true;
-  $("generation-status").textContent = "正在检索依据并生成内容，请稍候…";
+  $("generation-status").textContent = pack ? `正在分段读取资料、提取与总结知识点${summary ? "" : "并生成复习卷"}；整份资料可能需要几分钟，请稍候…` : "正在检索依据并生成内容，请稍候…";
   try {
-    const artifact = await post("/api/generate", body);
+    const artifact = await post(pack ? "/api/study" : "/api/generate", body);
     if (courseId !== currentCourse || epoch !== scopeEpoch) return;
     renderArtifact(artifact);
     $("generation-status").textContent = "已生成并保存，可以预览和下载。";
@@ -440,6 +471,96 @@ $("generation-form").addEventListener("submit", async event => {
 $("refresh-artifacts").addEventListener("click", () => loadArtifacts().catch(error => status(error.message, true)));
 $("more-artifacts").addEventListener("click", () => loadArtifacts(true).catch(error => status(error.message, true)));
 
+async function summarizeMaterial(doc, button) {
+  const courseId = currentCourse, epoch = scopeEpoch;
+  button.disabled = true; showView("generation");
+  $("generation-status").textContent = `正在逐段读取 ${doc.name}，提取知识点并整理总结，请稍候…`;
+  try {
+    const artifact = await post("/api/study", {course_id: courseId, document_ids: [doc.id], include_questions: false});
+    if (courseId !== currentCourse || epoch !== scopeEpoch) return;
+    renderArtifact(artifact); await loadArtifacts();
+    $("generation-status").textContent = "知识点与总结已保存，可从各节查找相关试题。";
+  } catch (error) { if (courseId === currentCourse && epoch === scopeEpoch) $("generation-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+function sourceCard(source) {
+  const card = element("article", undefined, "source");
+  const link = element("a", `[${source.citation_id}] ${source.document_name}`);
+  link.href = source.file_url; link.target = "_blank"; link.rel = "noopener";
+  const location = source.location_type === "pdf_page" ? `PDF 物理第 ${source.page} 页` :
+    source.location_type === "slide" ? `第 ${source.page} 张幻灯片` : `第 ${source.block_index} 个段落 / 表格块`;
+  card.append(link, element("small", location + (source.section ? ` · ${source.section}` : "")));
+  const details = element("details"); details.append(element("summary", "展开原文"), element("p", source.text, "question-text"));
+  card.append(element("p", source.text.slice(0, 260) + (source.text.length > 260 ? "…" : "")), details);
+  return card;
+}
+
+let relationEpoch = 0;
+async function openRelations(args = {}, button) {
+  const courseId = currentCourse, epoch = scopeEpoch, requestId = ++relationEpoch;
+  if (!courseId) return status("请先选择课程。", true);
+  const chosen = libraryDocuments.filter(d => selected.has(d.id));
+  const refs = chosen.filter(d => d.document_type !== "exam").map(d => d.id);
+  const exams = chosen.filter(d => d.document_type === "exam").map(d => d.id);
+  const body = {...args};
+  if (body.material_id) body.document_ids = [body.material_id];
+  else if (refs.length) body.document_ids = refs;
+  if (!body.exam_document_ids && exams.length) body.exam_document_ids = exams;
+  if (button) button.disabled = true;
+  $("relation-title").textContent = body.direction === "exam_to_material" ? "这道题，在资料哪里讲？" : "从知识点，找到练习题。";
+  $("relation-description").textContent = "参考资料按已选范围匹配；未选试卷时查找本课程全部已解析试卷。";
+  $("relation-content").replaceChildren(element("p", "正在检查知识点与资料正文…", "hint"));
+  if (!$("relation-dialog").open) $("relation-dialog").showModal();
+  try {
+    const result = await post(`/api/courses/${courseId}/material-question-links`, body);
+    if (courseId !== currentCourse || epoch !== scopeEpoch || requestId !== relationEpoch) return;
+    const target = $("relation-content"); target.replaceChildren(element("p", result.answer, "scope-summary"), element("p", result.warning, "hint"));
+    for (const link of result.links) {
+      const question = result.questions.find(q => q.id === link.question_id);
+      const card = element("article", undefined, "question-item relation-pair");
+      card.append(element("h3", `${question.paper_name} · 第 ${question.number} 题`));
+      card.append(element("p", link.method === "knowledge_label" ? `匹配知识点：${link.concepts.join("、")}` : "文本相似候选 · 请核对是否考查同一概念", "hint"), element("p", question.content, "question-text"));
+      const practice = element("button", "进入题库练习 ↗", "secondary"); practice.type = "button";
+      practice.addEventListener("click", () => { $("relation-dialog").close(); showView("exams"); renderQuestions([question], $("question-list")); });
+      card.append(practice);
+      const sources = element("div", undefined, "relation-sources");
+      result.sources.filter(s => link.chunk_ids.includes(s.chunk_id)).forEach(s => sources.append(sourceCard(s)));
+      card.append(sources); target.append(card);
+    }
+  } catch (error) { if (requestId === relationEpoch) $("relation-content").replaceChildren(element("p", error.message, "error")); }
+  finally { if (button) button.disabled = false; }
+}
+
+const knowledgeButton = element("button", "查看已保存的知识点总览 ↗", "secondary"); knowledgeButton.type = "button";
+$("artifact-history").before(knowledgeButton);
+knowledgeButton.addEventListener("click", async () => {
+  const courseId = currentCourse, epoch = scopeEpoch, requestId = ++relationEpoch;
+  if (!courseId) return status("请先选择课程。", true);
+  knowledgeButton.disabled = true;
+  $("relation-title").textContent = "你的知识点与总结";
+  $("relation-description").textContent = "读取已保存的整理结果。删除或重建后已失效的来源不会作为当前知识展示。";
+  $("relation-content").replaceChildren(element("p", "正在读取…", "hint"));
+  if (!$("relation-dialog").open) $("relation-dialog").showModal();
+  try {
+    const records = await api(`/api/courses/${courseId}/material-knowledge`);
+    if (courseId !== currentCourse || epoch !== scopeEpoch || requestId !== relationEpoch) return;
+    const target = $("relation-content"); target.replaceChildren();
+    if (!records.length) target.append(element("p", "尚未保存知识点总结。点击资料旁的「总结知识点」，或生成整份资料学习包。", "empty"));
+    for (const record of records) {
+      const card = element("article", undefined, "question-item");
+      card.append(element("h3", record.topic), element("p", record.summary, "question-text"));
+      if (record.mode === "demo") card.append(element("p", "离线演示：原文摘录，未进行模型总结。", "hint"));
+      const points = element("ul"); record.key_points.forEach(p => points.append(element("li", p))); card.append(points);
+      const match = element("button", "查找关联试题 ↗", "secondary"); match.type = "button";
+      match.addEventListener("click", () => openRelations({chunk_ids: record.sources.map(s => s.chunk_id), artifact_id: record.artifact_id}, match));
+      const preview = element("button", "查看完整总结 ↗", "secondary"); preview.type = "button";
+      preview.addEventListener("click", () => { $("relation-dialog").close(); openArtifact(record.artifact_id).catch(e => status(e.message, true)); });
+      card.append(match, preview); target.append(card);
+    }
+  } catch (error) { if (requestId === relationEpoch) $("relation-content").replaceChildren(element("p", error.message, "error")); }
+  finally { knowledgeButton.disabled = false; }
+});
 
 
 // Views, learning records and interaction state. All user/model text uses textContent.

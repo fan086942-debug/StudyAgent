@@ -29,6 +29,29 @@ class GenerationRequest(GenerationArgs):
     kind: Literal["review", "mock_exam"]
 
 
+class StudyPackArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    document_name: str | None = Field(default=None, min_length=1, max_length=255)
+    question_count: int | None = Field(default=None, ge=1, le=64)
+    question_type: PracticeType = "short_answer"
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    include_questions: bool = True
+
+
+class StudyPackRequest(StudyPackArgs):
+    course_id: str = Field(min_length=1, max_length=64)
+    document_ids: list[str] | None = Field(default=None, min_length=1, max_length=100)
+    kind: Literal["study_pack"] = "study_pack"
+
+
+class StudyGenerationTask(BaseModel):
+    kind: Literal["review", "mock_exam"]
+    topics: list[Topic] = Field(min_length=1, max_length=64)
+    question_count: int = Field(default=5, ge=1, le=64)
+    question_type: PracticeType = "short_answer"
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+
+
 class ReviewSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
     topic: Topic
@@ -64,15 +87,15 @@ class PracticeQuestion(BaseModel):
 class GeneratedContent(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: Topic
-    sections: list[ReviewSection] = Field(default_factory=list, max_length=8)
-    questions: list[PracticeQuestion] = Field(default_factory=list, max_length=12)
+    sections: list[ReviewSection] = Field(default_factory=list, max_length=64)
+    questions: list[PracticeQuestion] = Field(default_factory=list, max_length=64)
     insufficient_evidence: bool = False
 
 
 class ArtifactSummary(BaseModel):
     id: str
     course_id: str
-    kind: Literal["review", "mock_exam"]
+    kind: Literal["review", "mock_exam", "study_pack"]
     title: str
     mode: str
     created_at: str
@@ -80,8 +103,9 @@ class ArtifactSummary(BaseModel):
 
 
 class ArtifactOut(ArtifactSummary):
-    request: GenerationRequest
+    request: Annotated[GenerationRequest | StudyPackRequest, Field(discriminator="kind")]
     content: GeneratedContent
     sources: list[Source]
     usage: dict[str, int]
     total_ms: float
+    coverage: dict = Field(default_factory=dict)

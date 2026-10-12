@@ -265,3 +265,13 @@ body {
   .hero-art { translate: none !important; }
   .capability-card:hover { transform: none !important; }
 }
+/* Knowledge-to-practice pairs keep provenance visible on desktop and mobile. */
+.relation-dialog{width:min(980px,calc(100vw - 28px));max-height:88dvh;overflow:auto}
+.relation-pair{border-left:3px solid var(--green);animation:relation-in .2s ease-out}
+.relation-sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:12px;margin-top:16px}
+.relation-sources .source{min-width:0;overflow-wrap:anywhere}
+.relation-dialog .question-item button{margin:6px 8px 6px 0}
+.relation-dialog li{white-space:pre-wrap;overflow-wrap:anywhere}
+.document-actions{flex-wrap:wrap;gap:6px}
+@keyframes relation-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.relation-pair{animation:none}}

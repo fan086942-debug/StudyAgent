@@ -19,6 +19,7 @@ from app.services.exams import ExamService
 from app.services.generation import GenerationService
 from app.services.ingestion import IngestionService
 from app.services.learning import LearningService
+from app.services.material_learning import MaterialLearningService
 from app.services.qa import QAService
 
 logger = logging.getLogger("studyagent")
@@ -33,8 +34,9 @@ def model_services(state, settings):
         settings, state.sessions, state.retriever, exams, GenerationProvider(settings, state.http)
     )
     learning = LearningService(state.sessions, exams, generation)
+    material_learning = MaterialLearningService(state.sessions, exams, state.retriever)
     registry = ToolRegistry(
-        settings, state.sessions, state.retriever, exams, qa.llm, generation, learning
+        settings, state.sessions, state.retriever, exams, qa.llm, generation, learning, material_learning
     )
     planner = DemoPlanner() if settings.study_mode == "demo" else APIPlanner(settings, state.http)
     return dict(
@@ -44,6 +46,7 @@ def model_services(state, settings):
         qa=qa,
         generation=generation,
         learning=learning,
+        material_learning=material_learning,
         agent=StudyAgent(settings, registry, planner),
     )
 

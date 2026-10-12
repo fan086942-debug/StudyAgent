@@ -1,0 +1,51 @@
+// Uses synthetic material and scripts.documents_preview (8767), not the user library.
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ const root='http://127.0.0.1:8767';
+ try{
+  const course=await(await context.request.post(root+'/api/courses',{data:{name:'整份资料学习 · 隔离验收'}})).json();
+  const bytes=fs.readFileSync('data/study-test-fixtures/合成机器学习教材.docx');
+  const uploaded=await context.request.post(`${root}/api/courses/${course.id}/documents`,{multipart:{file:{name:'合成机器学习教材.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:bytes},document_type:'textbook'}});
+  assert.equal(uploaded.status(),201);
+  await page.goto(root);
+  await page.locator('#documents .empty').filter({hasText:'资料库是空的'}).waitFor();
+  await page.locator('#course').selectOption(course.id);
+  await page.locator('.document').waitFor();
+  await page.locator('#question').fill('对于机器学习这个本书，提取一下每张重点以及核心知识点为我出一份复习卷子');
+  await page.locator('#ask-button').click();
+  await page.locator('#answer').filter({hasText:'已生成并保存'}).waitFor();
+  assert.ok((await page.locator('#answer').innerText()).includes('9 个章节'));
+  await page.locator('#generated-artifacts button').click();
+  await page.locator('#artifact-preview').waitFor();
+  assert.equal(await page.locator('#artifact-content .question-item').count(),18);
+  await page.locator('#artifact-content button').filter({hasText:'查看这题的教材 / 课件依据'}).first().click();
+  assert.ok(await page.locator('#relation-content .source').count() > 0);
+  await page.locator('#relation-dialog button[aria-label="关闭学习关联"]').click();
+  assert.ok((await page.locator('#artifact-content .scope-summary').innerText()).includes('9 个章节'));
+  const download=page.locator('#artifact-downloads a').filter({hasText:'不附答案'});
+  const exported=await context.request.get(root+await download.getAttribute('href'));
+  assert.equal(exported.status(),200);
+  assert.ok(!(await exported.text()).includes('参考答案与解析'));
+  await page.locator('#generation-kind').selectOption('study_pack');
+  assert.equal(await page.locator('#generation-topics').isVisible(),false);
+  assert.equal(await page.locator('#generation-count').inputValue(),'');
+  await page.locator('#generate-button').click();
+  await page.locator('#generation-status').filter({hasText:'已生成并保存'}).waitFor();
+  await page.locator('#artifact-content .scope-summary').filter({hasText:'9 个章节'}).waitFor();
+  fs.mkdirSync('docs/screenshots',{recursive:true});
+  await page.screenshot({path:'docs/screenshots/study-pack.png',fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#artifact-title').scrollIntoViewIfNeeded();
+  const width=await page.evaluate(()=>({body:document.documentElement.scrollWidth,view:innerWidth}));
+  assert.ok(width.body<=width.view);
+  await page.screenshot({path:'docs/screenshots/study-pack-mobile.png',animations:'disabled'});
+  assert.deepEqual(errors,[]);
+  const result={natural_book_request:true,chapters_covered:9,review_and_exam_together:true,generated_question_material_evidence:true,scope_visible:true,questions_only_export:true,form_needs_no_topics:true,mobile_no_overflow:true,javascript_errors:errors};
+  fs.writeFileSync('docs/evaluation-study-ui.json',JSON.stringify(result,null,2)+'\n');
+  console.log(JSON.stringify(result,null,2));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

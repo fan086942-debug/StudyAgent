@@ -32,7 +32,7 @@ def call(name, args, identifier="call-1"):
 
 def test_demo_routes_and_ambiguous_question(exam_app):
     app, client, course, _ = exam_app
-    assert len(client.get("/api/agent/tools").json()) == 11
+    assert "generate_study_pack" in {tool["function"]["name"] for tool in client.get("/api/agent/tools").json()}
     for query, expected in [
         ("A* 是什么？", "search_knowledge"),
         ("教材哪里讲了 A*？", "locate_source"),

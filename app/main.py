@@ -18,6 +18,7 @@ from app.api.documents import router as documents_router
 from app.api.exams import router as exams_router
 from app.api.generation import router as generation_router
 from app.api.learning import router as learning_router
+from app.api.material_learning import router as material_learning_router
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.db.session import make_database
@@ -71,6 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(agent_router)
     app.include_router(generation_router)
     app.include_router(learning_router)
+    app.include_router(material_learning_router)
     app.include_router(connection_router)
     static = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static), name="static")

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     exam_batch_chars: int = Field(default=12000, ge=4000, le=20000)
     exam_max_batches: int = Field(default=20, ge=1, le=100)
     generation_max_tokens: int = Field(default=8000, ge=1000, le=16000)
+    study_window_chars: int = Field(default=24000, ge=4000, le=32000)
+    study_max_calls: int = Field(default=120, ge=4, le=200)
     agent_max_steps: int = Field(default=6, ge=1, le=12)
     agent_context_chars: int = Field(default=60000, ge=10000, le=150000)
 
