@@ -14,6 +14,7 @@ from app.models import (
     StudyPlan,
     WrongQuestion,
 )
+from app.services.study_checkpoint import purge_study_cache
 
 
 def delete_course(state, course_id: str):
@@ -58,6 +59,7 @@ def delete_course(state, course_id: str):
                     session.execute(delete(model).where(model.course_id == course_id))
                 session.execute(delete(Course).where(Course.id == course_id))
                 session.commit()
+            purge_study_cache(state.settings.data_dir, course_id)
         except Exception as exc:
             raise AppError(
                 "course_delete_incomplete",

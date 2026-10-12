@@ -23,7 +23,7 @@ class GenerationService:
         self.retriever, self.exams, self.provider = retriever, exams, provider
         self.lock = Lock()
 
-    def generate(self, request: GenerationRequest) -> ArtifactOut:
+    def generate(self, request: GenerationRequest, avoid_stems=()) -> ArtifactOut:
         self.exams.validate_scope(request.course_id, request.document_ids)
         if request.kind == "mock_exam" and request.question_count < len(request.topics):
             raise AppError("invalid_blueprint", "题数不能少于主题数，每个主题至少一道题", 422)
@@ -38,7 +38,7 @@ class GenerationService:
         if not self.lock.acquire(blocking=False):
             raise AppError("generation_busy", "已有内容正在生成，请稍后重试", 409)
         try:
-            return self._generate(request)
+            return self._generate(request, avoid_stems)
         finally:
             self.lock.release()
 
@@ -85,11 +85,11 @@ class GenerationService:
             topic_ids[topic] = accepted
         return sources, topic_ids
 
-    def _generate(self, request):
+    def _generate(self, request, avoid_stems=()):
         start = time.perf_counter()
         sources, topic_ids = self._evidence(request)
         if self.settings.study_mode == "demo":
-            content, usage = self._demo(request, sources, topic_ids), {}
+            content, usage = self._demo(request, sources, topic_ids, excluded=avoid_stems), {}
             warning = "演示模式：复习内容为原文摘录，练习题为摘录模板；未调用 LLM，难度未评估。"
         else:
             content, usage = self.provider.generate(
@@ -97,10 +97,24 @@ class GenerationService:
                 {
                     "topics": topic_ids,
                     "sources": [{"id": s.citation_id, "text": s.text} for s in sources],
+                    "avoid_stems": list(avoid_stems),
                 },
             )
             warning = "模型生成的复习内容与参考答案需对照原文核查，题目难度为模型估计，非官方试卷。"
-        self._validate(request, content, topic_ids)
+        try:
+            self._validate(request, content, topic_ids)
+            if any(
+                re.sub(r"\s+", "", q.stem) in {re.sub(r"\s+", "", stem) for stem in avoid_stems}
+                for q in content.questions
+            ):
+                raise AppError(
+                    "generation_duplicate_questions",
+                    "模型重复了当前对话中的题目，未保存，请重试。",
+                    502,
+                )
+        except AppError as exc:
+            exc.usage = usage
+            raise
         # 所有生成和校验完成后才写一次事务，失败不会在历史中留下半份成品。
         with self.sessions() as session:
             row = StudyArtifact(
@@ -197,7 +211,15 @@ class GenerationService:
         questions, used = [], set(excluded)
         for index in range(request.question_count):
             topic = request.topics[index % len(request.topics)]
-            candidate = next((p for p in pools[topic] if p[0] not in used), None)
+            candidate = next(
+                (
+                    p
+                    for p in pools[topic]
+                    if p[0] not in used
+                    and f"阅读材料：{p[0]}\n请概括这段材料中与「{topic}」相关的要点。" not in used
+                ),
+                None,
+            )
             if candidate is None:
                 raise AppError(
                     "demo_insufficient_excerpts",

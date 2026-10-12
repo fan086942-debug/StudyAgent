@@ -9,6 +9,7 @@ from app.core.errors import AppError
 from app.models import Document, DocumentChunk, StudyArtifact
 from app.rag.sources import chunk_source
 from app.schemas.generation import GeneratedContent, ReviewSection, StudyGenerationTask
+from app.services.study_checkpoint import StudyCheckpoint
 
 
 def normalize(text):
@@ -182,13 +183,19 @@ def exam_batches(units, count):
 def generate_study_pack(service, request):
     if not service.lock.acquire(blocking=False):
         raise AppError("generation_busy", "已有内容正在生成，请稍后重试", 409)
+    checkpoint = StudyCheckpoint(service, request)
     try:
-        return _generate(service, request)
+        return _generate(service, request, checkpoint)
+    except AppError as exc:
+        exc.usage = dict(checkpoint.usage)
+        if checkpoint.saved + checkpoint.hits:
+            exc.message += f"。已保留 {checkpoint.saved + checkpoint.hits} 段已完成整理，再次提交相同资料可继续，避免重复整理。"
+        raise
     finally:
         service.lock.release()
 
 
-def _generate(service, request):
+def _generate(service, request, checkpoint):
     start = time.perf_counter()
     docs, units, sources, ignored = material_units(service, request)
     count = request.question_count or max(5, len(units))
@@ -213,7 +220,7 @@ def _generate(service, request):
         raise AppError(
             "study_scope_too_large", "整份资料超出本次学习任务预算，请选择部分资料分次学习", 422
         )
-    sections, usage, calls = [], {}, 0
+    sections, usage = [], checkpoint.usage
     lookup = {s.citation_id: s for s in sources}
     for unit, unit_batches in zip(units, batches):
         task = StudyGenerationTask(kind="review", topics=[unit["topic"]])
@@ -223,10 +230,12 @@ def _generate(service, request):
             if service.settings.study_mode == "demo":
                 content = service._demo(task, batch, ids)
             else:
-                content, used = service.provider.generate(task, evidence(ids, batch))
-                calls += 1
-                for key, value in used.items():
-                    usage[key] = usage.get(key, 0) + value
+                content = checkpoint.generate(
+                    task,
+                    evidence(ids, batch),
+                    batch,
+                    lambda result: validate(service, task, result, ids, batch),
+                )
             validate(service, task, content, ids, batch)
             partials.extend(content.sections)
         if len(partials) == 1:
@@ -244,7 +253,7 @@ def _generate(service, request):
             else:
                 # Consolidate drafts with their observed original citations, without losing scope.
                 snapshots = [lookup[c] for c in cited]
-                content, used = service.provider.generate(
+                content = checkpoint.generate(
                     task,
                     evidence(
                         ids,
@@ -252,11 +261,10 @@ def _generate(service, request):
                         partial_reviews=[part.model_dump() for part in partials],
                         consolidate=True,
                     ),
+                    snapshots,
+                    lambda result: validate(service, task, result, ids, snapshots),
                 )
-                calls += 1
                 validate(service, task, content, ids, snapshots)
-                for key, value in used.items():
-                    usage[key] = usage.get(key, 0) + value
                 section = content.sections[0]
         sections.append(section)
     questions = []
@@ -288,7 +296,7 @@ def _generate(service, request):
                 )
             content = GeneratedContent(title="摘录练习", questions=items)
         else:
-            content, used = service.provider.generate(
+            content = checkpoint.generate(
                 task,
                 evidence(
                     ids,
@@ -297,10 +305,9 @@ def _generate(service, request):
                     question_blueprint=blueprint,
                     avoid_stems=[q.stem for q in questions],
                 ),
+                exam_sources,
+                lambda result: validate(service, task, result, ids, exam_sources),
             )
-            calls += 1
-            for key, value in used.items():
-                usage[key] = usage.get(key, 0) + value
         validate(service, task, content, ids, exam_sources)
         if Counter(q.topic for q in content.questions) != Counter(blueprint):
             raise AppError(
@@ -322,7 +329,8 @@ def _generate(service, request):
         documents=[dict(id=doc.id, name=doc.name) for doc in docs],
         read_chunks=len(sources),
         read_characters=sum(len(s.text) for s in sources),
-        generation_calls=calls,
+        generation_calls=checkpoint.calls,
+        cached_summaries=checkpoint.hits,
         units=[
             dict(
                 topic=u["topic"],

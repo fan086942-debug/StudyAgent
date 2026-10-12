@@ -1,0 +1,42 @@
+{
+  "model": "deepseek-flash",
+  "material": "自编合成资料（不包含用户教材）",
+  "request": "根据层次聚类出两道题目",
+  "tools": [
+    "generate_mock_exam"
+  ],
+  "questions": [
+    {
+      "topic": "层次聚类",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "stem": "简述凝聚层次聚类的基本过程，并说明单链接、完全链接和平均链接在合并簇时分别如何使用跨簇点对距离。",
+      "options": [],
+      "answer": "凝聚层次聚类从每个点各自作为一个簇开始，反复合并距离最近的两个簇，逐步形成层次结构。单链接使用跨簇点对距离的最小值，完全链接使用最大值，平均链接使用所有跨簇点对距离的平均值。",
+      "explanation": "该过程强调自底向上合并，三种链接方式的区别在于用最小值、最大值或平均值来定义簇间距离。",
+      "citation_ids": [
+        "S2"
+      ]
+    },
+    {
+      "topic": "层次聚类",
+      "type": "short_answer",
+      "difficulty": "medium",
+      "stem": "在层次聚类中，若采用欧氏距离衡量点与点之间的距离，应如何计算两个点之间的距离？",
+      "options": [],
+      "answer": "欧氏距离等于对应坐标差的平方和再开方。",
+      "explanation": "欧氏距离先计算各维坐标差的平方，求和后再开方，是层次聚类中常用的点对距离度量。",
+      "citation_ids": [
+        "S2"
+      ]
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1601,
+    "completion_tokens": 249,
+    "total_tokens": 1850,
+    "prompt_cache_hit_tokens": 512,
+    "prompt_cache_miss_tokens": 1089
+  },
+  "success": true
+}

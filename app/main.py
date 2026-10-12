@@ -103,6 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 content={
                     "code": exc.code,
                     "message": exc.message,
+                    "usage": exc.usage,
                     "request_id": request.state.request_id,
                 },
             )
@@ -138,6 +139,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={
                 "code": exc.code,
                 "message": exc.message,
+                "usage": exc.usage,
                 "request_id": request.state.request_id,
             },
         )

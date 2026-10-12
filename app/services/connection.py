@@ -15,6 +15,7 @@ from app.llm.compatible_provider import CompatibleLLM, post_json
 from app.llm.exam_provider import ExamExtractor
 from app.llm.generation_provider import GenerationProvider
 from app.schemas.connection import ConnectionInput
+from app.services.agent_memory import AgentMemory
 from app.services.exams import ExamService
 from app.services.generation import GenerationService
 from app.services.ingestion import IngestionService
@@ -36,9 +37,18 @@ def model_services(state, settings):
     learning = LearningService(state.sessions, exams, generation)
     material_learning = MaterialLearningService(state.sessions, exams, state.retriever)
     registry = ToolRegistry(
-        settings, state.sessions, state.retriever, exams, qa.llm, generation, learning, material_learning
+        settings,
+        state.sessions,
+        state.retriever,
+        exams,
+        qa.llm,
+        generation,
+        learning,
+        material_learning,
     )
     planner = DemoPlanner() if settings.study_mode == "demo" else APIPlanner(settings, state.http)
+    if not hasattr(state, "agent_memory"):
+        state.agent_memory = AgentMemory(state.sessions)
     return dict(
         settings=settings,
         exams=exams,
@@ -47,7 +57,7 @@ def model_services(state, settings):
         generation=generation,
         learning=learning,
         material_learning=material_learning,
-        agent=StudyAgent(settings, registry, planner),
+        agent=StudyAgent(settings, registry, planner, state.agent_memory),
     )
 
 
@@ -213,4 +223,7 @@ class ModelConnection:
                 "接口可响应，但未返回有效工具调用，请选择支持 Tool Calling 的模型",
                 502,
             ) from exc
-        return {"status": "ok", "message": "连接成功，模型支持工具调用。点击保存并启用即可使用。"}
+        return {
+            "status": "ok",
+            "message": "基础连接成功，接口与工具调用可用。此测试不验证长教材生成或最终回答格式；点击保存并启用即可使用。",
+        }

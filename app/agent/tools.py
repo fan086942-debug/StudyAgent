@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pydantic import ValidationError
 from sqlalchemy import select
 
-from app.agent.intents import study_intent
+from app.agent.intents import generation_requested, study_intent
 from app.core.errors import AppError
 from app.models import Document
 from app.schemas.agent import KnowledgeArgs, QuestionArgs, ToolResult
@@ -78,6 +78,7 @@ class ToolContext:
     plans: dict = field(default_factory=dict)
     learning: dict = field(default_factory=dict)
     learning_answer: str = ""
+    prior_questions: list[dict] = field(default_factory=list)
 
     def cite(self, sources: list[Source]) -> list[Source]:
         result = []
@@ -216,9 +217,7 @@ class ToolRegistry:
                 raise AppError("no_weak_topics", "还没有带知识点的待复习错题，请先记录练习")
             args = GenerationArgs(topics=topics)
         if name in {"generate_review", "generate_mock_exam", "generate_weakness_review"}:
-            if not re.search(
-                r"生成|整理|制作|出题|出.*卷|复习提纲|模拟卷|模拟试卷", request.question
-            ):
+            if not generation_requested(request.question):
                 raise AppError("generation_not_requested", "用户尚未要求生成复习资料或练习卷")
             artifact = self.generation.generate(
                 GenerationRequest(
@@ -226,7 +225,12 @@ class ToolRegistry:
                     course_id=request.course_id,
                     document_ids=request.document_ids,
                     kind="mock_exam" if name == "generate_mock_exam" else "review",
-                )
+                ),
+                avoid_stems=[
+                    q["stem"] for q in context.prior_questions if q["topic"] in args.topics
+                ]
+                if name == "generate_mock_exam"
+                else (),
             )
             summary = ArtifactSummary.model_validate(artifact.model_dump())
             context.artifacts[artifact.id] = summary

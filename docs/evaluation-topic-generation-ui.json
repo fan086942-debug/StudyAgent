@@ -1,0 +1,15 @@
+{
+  "request": "根据层次聚类出两道题目",
+  "tool": "generate_mock_exam",
+  "questions": 2,
+  "answer_and_explanation": true,
+  "source_modal": true,
+  "questions_only_download": true,
+  "persisted_after_reload": true,
+  "contextual_question_followup": true,
+  "contextual_generation": true,
+  "session_restored_after_reload": true,
+  "new_session_clears_context": true,
+  "mobile_no_overflow": true,
+  "javascript_errors": []
+}

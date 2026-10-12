@@ -275,3 +275,5 @@ body {
 .document-actions{flex-wrap:wrap;gap:6px}
 @keyframes relation-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.relation-pair{animation:none}}
+/* Current Agent conversation, separate from saved learning history. */
+.session-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}.session-history{margin:0 0 16px;padding:14px 18px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.session-history summary{cursor:pointer;color:var(--green)}#session-turns{max-height:360px;overflow:auto;overscroll-behavior:contain}.session-turn{padding:14px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}.session-turn strong{display:block;color:var(--green)}.session-turn p{margin:8px 0 0;font-size:13px;white-space:pre-wrap}

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.llm.base import GenerationResult, ModelAnswer
+from app.llm.structured import choice_of, parse_content, usage_of
 
 logger = logging.getLogger("studyagent")
 
@@ -80,6 +81,7 @@ class CompatibleLLM:
             {
                 "model": settings.llm_model,
                 "temperature": 0.1,
+                "response_format": {"type": "json_object"},
                 "max_tokens": 1800,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
@@ -93,17 +95,9 @@ class CompatibleLLM:
             },
         )
         try:
-            content = result["choices"][0]["message"]["content"]
-            # 部分兼容服务虽然遵循 JSON 字段，但仍会加代码围栏。
-            if content.strip().startswith("```"):
-                content = "\n".join(content.strip().splitlines()[1:-1])
-            answer = ModelAnswer.model_validate_json(content)
-            raw_usage = result.get("usage")
-            usage = (
-                {k: v for k, v in raw_usage.items() if isinstance(v, int)}
-                if isinstance(raw_usage, dict)
-                else None
-            )
+            content = choice_of(result, "llm")["message"]["content"]
+            answer = parse_content(content, ModelAnswer)
+            usage = usage_of(result)
             logger.info("llm_completed usage=%s", usage)
             return GenerationResult(content=answer, usage=usage)
         except (
@@ -114,4 +108,4 @@ class CompatibleLLM:
             ValueError,
             ValidationError,
         ) as exc:
-            raise AppError("llm_invalid_output", "模型没有返回约定的回答结构，请重试", 502) from exc
+            raise AppError("llm_invalid_output", "模型没有返回约定的回答结构，请重试", 502, usage=usage_of(result)) from exc

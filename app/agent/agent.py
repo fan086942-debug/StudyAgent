@@ -3,7 +3,7 @@ import logging
 import time
 from uuid import uuid4
 
-from app.agent.intents import relation_intent, study_intent
+from app.agent.intents import relation_intent, study_intent, topic_generation_intent
 from app.agent.planner import AGENT_PROMPT
 from app.agent.tools import TOOL_SPECS, ToolContext, valid_answer
 from app.core.errors import AppError
@@ -14,20 +14,52 @@ logger = logging.getLogger("studyagent")
 
 
 class StudyAgent:
-    def __init__(self, settings, registry, planner):
+    def __init__(self, settings, registry, planner, memory=None):
         self.settings, self.registry, self.planner = settings, registry, planner
+        self.memory = memory
 
     def run(self, request: SearchRequest) -> AgentResponse:
         self.registry.exams.validate_scope(request.course_id, request.document_ids)
+        if self.memory and getattr(request, "session_id", None):
+            with self.memory.turn(request) as (entry, history, reset):
+                result = self._run(request, history)
+                self.memory.remember(entry, request, result, self.registry.generation)
+                result.session_id, result.context_turns, result.context_reset = (
+                    request.session_id,
+                    len(entry.turns),
+                    reset,
+                )
+                return result
+        return self._run(request, [])
+
+    def _run(self, request, history):
         start, run_id = time.perf_counter(), uuid4().hex
         context = ToolContext(request)
+        context.prior_questions = [q for turn in history for q in turn["generated_questions"]]
         intent = relation_intent(request.question)
         tool = "match_material_questions" if intent is not None else "generate_study_pack"
         if intent is None:
             intent = study_intent(request.question)
+        if intent is None:
+            topic_intent = topic_generation_intent(request.question)
+            if topic_intent is not None:
+                tool, intent = topic_intent
+                if not intent["topics"] and history:
+                    intent["topics"] = history[-1]["topics"]
         if intent is not None:
             begun = time.perf_counter()
             try:
+                if tool in {"generate_mock_exam", "generate_review"}:
+                    if not intent["topics"]:
+                        raise AppError(
+                            "generation_topic_required",
+                            "请说明出题或复习的知识点，例如：根据层次聚类出两道题目。",
+                        )
+                    if not 1 <= intent["question_count"] <= 12:
+                        raise AppError(
+                            "generation_question_limit",
+                            "按知识点出题支持每次 1–12 道题，请调整题数。",
+                        )
                 result = self.registry.execute(
                     tool, json.dumps(intent, ensure_ascii=False), context
                 )
@@ -76,13 +108,20 @@ class StudyAgent:
                     insufficient_evidence=True,
                     finish_reason="study_failed",
                     warning=exc.message,
-                    usage={},
+                    usage=exc.usage,
                     total_ms=(time.perf_counter() - start) * 1000,
                 )
         messages = [
             {"role": "system", "content": AGENT_PROMPT},
-            {"role": "user", "content": request.question},
         ]
+        for turn in history:
+            messages.extend(
+                [
+                    {"role": "user", "content": turn["question"]},
+                    {"role": "assistant", "content": json.dumps(turn, ensure_ascii=False)},
+                ]
+            )
+        messages.append({"role": "user", "content": request.question})
         trace, usage, cache, call_ids = [], {}, {}, set()
         warning, reason, final = None, "step_limit", None
         # 一轮由“模型选择 → 校验参数 → 执行工具 → 回传观察”组成。
@@ -94,6 +133,7 @@ class StudyAgent:
             try:
                 turn = self.planner.step(messages, self.registry.schemas())
             except AppError as exc:
+                self._usage(usage, exc.usage)
                 reason, warning = "provider_error", exc.message
                 break
             self._usage(usage, turn.usage)
@@ -143,6 +183,7 @@ class StudyAgent:
                         "insufficient_evidence": output.get("insufficient_evidence", False),
                     }
                 except AppError as exc:
+                    self._usage(usage, exc.usage)
                     context.sources, context.questions = before_sources, before_questions
                     context.artifacts, context.plans = before_artifacts, before_plans
                     context.learning, context.learning_answer = before_learning, before_answer

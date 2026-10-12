@@ -1,5 +1,100 @@
 import re
 
+NUMBER = r"(?:\d+|[零一二两三四五六七八九十百]+)"
+COUNT = rf"({NUMBER})\s*(?:道(?:题目?)?|题目?)"
+NEGATED_GENERATION = (
+    r"(?:不要|不用|不需要|无需|不必|别).{0,12}(?:出|生成|制作|准备).{0,20}(?:题|卷|复习)"
+)
+EXAM_ACTION = rf"(?:生成|制作|准备).{{0,160}}(?:题|卷)|出\s*(?:{NUMBER}\s*(?:道|题|套|份)|题|卷)|再(?:来|给我)?\s*{NUMBER}\s*(?:道|题)|模拟卷|模拟试卷"
+
+
+def question_count(question):
+    match = re.search(COUNT, question)
+    if not match:
+        return None
+    value = match[1]
+    if value.isdigit():
+        return int(value)
+    digits = dict(zip("零一二两三四五六七八九", (0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9)))
+    total, digit = 0, 0
+    for char in value:
+        if char in digits:
+            digit = digits[char]
+        else:
+            total += (digit or 1) * (10 if char == "十" else 100)
+            digit = 0
+    return total + digit
+
+
+def generation_requested(question):
+    """One authorization rule shared by routing and tool execution."""
+    if re.search(NEGATED_GENERATION, question):
+        return False
+    return bool(re.search(EXAM_ACTION + r"|(?:生成|制作|准备|整理).*复习|复习提纲", question))
+
+
+def topic_generation_intent(question):
+    """Explicit topic generation never depends on a planner choosing search vs. create."""
+    if not generation_requested(question) or re.search(r"错题|薄弱|复习计划|学习计划", question):
+        return None
+    exam = bool(re.search(EXAM_ACTION, question))
+    topic = question
+    # In "根据 X 出两道题，附解析", X is the topic; trailing requirements are not topics.
+    before_action = re.match(
+        rf"(?:请帮我|请为我|帮我|为我|给我|请)?\s*(?:根据|基于|针对|关于|围绕)\s*(.+?)\s*(?:生成|制作|准备|出(?=\s*(?:{NUMBER}|题|卷)))",
+        question,
+    )
+    if before_action:
+        topic = before_action[1]
+    else:
+        topic = re.split(r"[，,；;]\s*(?:并|附|带|含|给|提供|包含|要求)", topic, maxsplit=1)[0]
+        topic = re.sub(rf"出(?=\s*(?:{NUMBER}|题|卷))", " ", topic)
+        topic = re.sub(COUNT, " ", topic)
+        topic = re.sub(
+            r"请帮我|请为我|帮我|为我|给我|请|一下|根据|基于|针对|关于|围绕|生成|整理|制作|准备|"
+            r"一份|一套|复习资料|复习提纲|模拟试卷|模拟卷|模拟题|练习题|试卷|卷子|"
+            r"题目|选择题|简答题|计算题|基础难度|简单|基础|中等难度|适中|高难度|困难|进阶",
+            " ",
+            topic,
+        )
+        topic = re.sub(r"^(?:再来|再给我|再|继续)\s*", "", topic.strip())
+        topic = re.sub(r"题$", "", topic.strip())
+    topic = re.sub(r"\s+", " ", topic).strip(' 的，。？！,:：?!"“”')
+    # Deictic requests need a topic; an arbitrary filler must not become a retrieval query.
+    if topic in {
+        "",
+        "这个知识点",
+        "这个",
+        "这一知识点",
+        "上述知识点",
+        "该知识点",
+        "它",
+        "这个主题",
+        "同一主题",
+    }:
+        topics = []
+    else:
+        topics = [
+            item.strip(" 的 ") for item in re.split(r"[，,、；;]", topic) if item.strip(" 的 ")
+        ]
+    return (
+        "generate_mock_exam" if exam else "generate_review",
+        dict(
+            topics=topics,
+            question_count=3 if question_count(question) is None else question_count(question),
+            question_type="choice"
+            if "选择题" in question
+            else "calculation"
+            if "计算题" in question
+            else "short_answer",
+            difficulty="hard"
+            if re.search(r"高难度|困难|进阶", question)
+            else "easy"
+            if re.search(r"简单|基础", question)
+            else "medium",
+        ),
+    )
+
 
 def study_intent(question):
     """Route explicit whole-material learning, independently of file format."""
@@ -17,7 +112,7 @@ def study_intent(question):
     )
     chapters = bool(re.search(r"每[章张]|各章|逐章|各个章节|每个章节", question))
     exam = bool(re.search(r"复习卷|卷子|(?:生成|制作|出|准备).*(?:卷|题)", question))
-    if re.search(r"(?:不要|不用|不需要|无需|不必).{0,5}(?:出题|出卷|试卷|练习题|复习卷)", question):
+    if re.search(NEGATED_GENERATION, question):
         exam = False
     knowledge = bool(
         re.search(
@@ -30,14 +125,13 @@ def study_intent(question):
         (material and (knowledge or exam)) or (chapters and knowledge) or "复习卷" in question
     ):
         return None
-    count = re.search(r"(\d+)\s*(?:道|题)", question)
     hint = re.search(r"(?:对于|针对|根据|基于)\s*(.+?)\s*这[个本份]", question)
     name = hint[1].strip() if hint else None
     if name and re.search(r"上传|当前|全部|选中|这些|我的", name):
         name = None
     return dict(
         document_name=name,
-        question_count=int(count[1]) if count else None,
+        question_count=question_count(question),
         question_type="choice"
         if "选择题" in question
         else "calculation"

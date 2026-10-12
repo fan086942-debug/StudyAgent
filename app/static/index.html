@@ -6,8 +6,8 @@
   <title>StudyAgent · 让知识，连成线。</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%232b6654'/%3E%3Cpath d='M12 12h16v7H16v4h12v5H12v-9h12v-3H12z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/vibrant.css?v=20261012-learning">
-  <script src="/static/app.js?v=20261012-learning" defer></script>
+  <link rel="stylesheet" href="/static/vibrant.css?v=20261012-session">
+  <script src="/static/app.js?v=20261012-session" defer></script>
   <script src="/static/interactions.js?v=20261010" defer></script>
   <script src="/static/connection.js?v=20261011" defer></script>
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('study-theme')||'light';document.documentElement.dataset.palette=localStorage.getItem('study-palette')||'aurora'}catch{}</script>
@@ -72,6 +72,8 @@
         <div class="stats-grid" aria-label="学习概况"><article class="stat-card"><span>可用学习资料</span><strong id="stat-documents">—</strong><small>你的知识起点</small><svg class="icon"><use href="#i-book"/></svg></article><article class="stat-card"><span>累计练习</span><strong id="stat-attempts">—</strong><small>每次尝试都算数</small><svg class="icon"><use href="#i-spark"/></svg></article><article class="stat-card"><span>待复习错题</span><strong id="stat-wrong">—</strong><small>从薄弱处向前一步</small><svg class="icon"><use href="#i-check"/></svg></article><article class="stat-card"><span>计划完成</span><strong id="stat-plan">—</strong><small>按自己的节奏前进</small><svg class="icon"><use href="#i-clock"/></svg></article></div>
         <div class="section-heading"><div><div class="eyebrow">ASK & EXPLORE</div><h2>从一个好问题开始</h2></div><span class="section-number">01 —</span></div>
         <div id="mode-note" class="notice">正在读取服务模式…</div>
+        <div class="session-bar"><span id="session-count" class="hint">新对话 · 可以连续追问</span><button id="new-session" type="button" class="link-button">＋ 新对话</button></div>
+        <details id="session-history" class="session-history" hidden><summary>查看当前对话</summary><p class="hint">Agent 保留最近 10 轮上下文，闲置两小时或服务重启后清空。切换课程或资料范围会开启新对话。</p><div id="session-turns"></div></details>
         <form id="question-form" class="question-card"><div class="composer-top"><span class="composer-label"><svg class="icon"><use href="#i-spark"/></svg> 你的学习助手</span><label class="sr-only" for="task-mode">提问方式</label><select id="task-mode"><option value="agent">Agent · 自动选择工具</option><option value="chat">资料问答 · RAG</option></select></div><label class="sr-only" for="question">你想了解什么？</label><textarea id="question" maxlength="2000" rows="3" placeholder="向你的资料提问，让知识从这里连接…" required></textarea><div class="question-actions"><span class="hint"><span id="question-count">0</span> / 2000 <span class="composer-shortcut">· Ctrl + Enter 发送</span></span><button id="ask-button" type="submit">开始分析 <span>↗</span></button></div></form>
         <div class="prompt-chips"><button type="button" data-prompt="教材哪里讲了 A*？">↗ 定位资料原文</button><button type="button" data-prompt="A* 以前怎么考过？">↗ 查找历史考题</button><button type="button" data-prompt="查看我的学习进度">↗ 了解我的学习进度</button></div>
         <div id="analysis-progress" class="loading-card" hidden aria-live="polite"><span class="spinner"></span><div><strong>学习助手正在处理</strong><p>请求已发送，正在等待检索与工具执行结果… <span id="elapsed-label">0 秒</span></p></div><div class="loading-track"></div></div>

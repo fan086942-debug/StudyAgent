@@ -1,0 +1,71 @@
+{
+  "model": "deepseek-flash",
+  "material": "自编合成三章资料（不包含用户教材）",
+  "chapters": 3,
+  "questions": 3,
+  "study_usage": {
+    "prompt_tokens": 6181,
+    "completion_tokens": 1200,
+    "total_tokens": 7381,
+    "prompt_cache_hit_tokens": 512,
+    "prompt_cache_miss_tokens": 5669
+  },
+  "question_usage": {
+    "prompt_tokens": 9562,
+    "completion_tokens": 308,
+    "total_tokens": 9870,
+    "prompt_cache_hit_tokens": 3072,
+    "prompt_cache_miss_tokens": 6490
+  },
+  "question_tools": [
+    "search_knowledge",
+    "search_knowledge"
+  ],
+  "answer": "层次聚类（凝聚式）的基本概念：它从每个样本各自成为一个单点簇开始，反复合并当前距离最近的两个簇，逐步形成一棵层次结构（聚类树），因此不需要预先指定簇数 [S2]。\n\n簇间距离的计算方式（链接准则）有三种 [S2]：\n1. 单链接（single link）：取两个簇之间所有跨簇点对距离的最小值；\n2. 完全链接（complete link）：取跨簇点对距离的最大值；\n3. 平均链接（average link）：取所有跨簇点对距离的平均值。\n\n点与点之间的距离常用欧氏距离，即对应坐标差的平方和再开方 [S2]。\n\n补充说明：资料中只给出了上述链接准则与欧氏距离的定义，未展开更细的公式推导或复杂度分析；如需更深入内容，可进一步查阅该章原文 [S1]。",
+  "coverage": {
+    "documents": [
+      {
+        "id": "07bdc2f3c4f646f1983ba0f970ab3623",
+        "name": "自编三章学习资料.docx"
+      }
+    ],
+    "read_chunks": 6,
+    "read_characters": 290,
+    "generation_calls": 4,
+    "cached_summaries": 0,
+    "units": [
+      {
+        "topic": "第1章层次聚类",
+        "structure": "chapter",
+        "chunks": 2,
+        "subtopics": [
+          "第1章层次聚类"
+        ],
+        "first_page": 0,
+        "last_page": 0
+      },
+      {
+        "topic": "第2章K均值",
+        "structure": "chapter",
+        "chunks": 2,
+        "subtopics": [
+          "第2章K均值"
+        ],
+        "first_page": 0,
+        "last_page": 0
+      },
+      {
+        "topic": "第3章泛化与验证",
+        "structure": "chapter",
+        "chunks": 2,
+        "subtopics": [
+          "第3章泛化与验证"
+        ],
+        "first_page": 0,
+        "last_page": 0
+      }
+    ],
+    "ignored_documents": []
+  },
+  "success": true
+}

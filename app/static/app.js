@@ -4,6 +4,46 @@ let currentCourse = "";
 let maxUploadMb = 200;
 let documentRefreshTimer = null;
 let libraryDocuments = [];
+let activeSession = null;
+let sessionScope = "";
+let sessionEpoch = 0;
+function sessionScopeKey() { return JSON.stringify([currentCourse, [...selected].sort()]); }
+function synchronizeSession(force = false) {
+  const scope = sessionScopeKey();
+  if (!force && activeSession && scope === sessionScope) return;
+  const firstLoad = !sessionScope;
+  let restored;
+  if (firstLoad && !force) {
+    try { restored = JSON.parse(sessionStorage.getItem("study-agent-session") || "null"); } catch {}
+  }
+  sessionScope = scope; sessionEpoch += 1;
+  activeSession = restored?.scope === scope ? restored.id : crypto.randomUUID().replaceAll("-", "");
+  try { sessionStorage.setItem("study-agent-session", JSON.stringify({scope, id: activeSession})); } catch {}
+  $("session-turns").replaceChildren();
+  $("session-history").hidden = true;
+  $("session-count").textContent = "新对话 · 可以连续追问";
+  if (currentCourse) loadSession().catch(() => {});
+}
+async function loadSession() {
+  const identifier = activeSession, epoch = sessionEpoch;
+  const query = new URLSearchParams({course_id: currentCourse});
+  [...selected].forEach(id => query.append("document_ids", id));
+  const result = await api(`/api/agent/sessions/${identifier}?${query}`);
+  if (identifier !== activeSession || epoch !== sessionEpoch) return;
+  $("session-turns").replaceChildren();
+  for (const turn of result.turns) {
+    const card = element("article", undefined, "session-turn");
+    card.append(element("strong", turn.question), element("p", turn.answer, "question-text"));
+    $("session-turns").append(card);
+  }
+  $("session-count").textContent = result.turns.length ? `当前对话 · 已串联 ${result.turns.length} 轮` : "新对话 · 可以连续追问";
+  $("session-history").hidden = !result.turns.length;
+}
+$("new-session").addEventListener("click", () => {
+  questionController?.abort(); askEpoch += 1; $("ask-button").disabled = false; setAnalyzing(false);
+  synchronizeSession(true); $("session-history").hidden = true; $("result").hidden = true;
+  $("question").value = ""; updateQuestionCount(); status("已开启新对话，之前的问答仍可在学习记录中查看。");
+});
 
 function status(message, error = false) {
   $("status").textContent = message;
@@ -16,7 +56,7 @@ async function api(path, options = {}) {
   catch (error) { if (error.name === "AbortError") throw error; throw new Error("无法连接学习服务，请确认服务正在运行。"); }
   let data;
   try { data = await response.json(); } catch { throw new Error("服务返回了无法读取的响应，请重试。"); }
-  if (!response.ok) throw new Error((data.message || "请求失败，请检查输入并重试。") + (data.request_id ? `（请求 ${data.request_id.slice(0, 8)}）` : ""));
+  if (!response.ok) throw new Error((data.message || "请求失败，请检查输入并重试。") + (data.usage?.total_tokens ? ` · 模型报告用量 ${data.usage.total_tokens} tokens` : "") + (data.request_id ? `（请求 ${data.request_id.slice(0, 8)}）` : ""));
   return data;
 }
 function post(path, data, options = {}) {
@@ -187,12 +227,15 @@ $("question-form").addEventListener("submit", async (event) => {
   const courseId = currentCourse, epoch = scopeEpoch, askId = ++askEpoch;
   questionController?.abort(); questionController = new AbortController();
   const body = { course_id: courseId, question: $("question").value.trim() };
+  const identifier = activeSession;
+  if ($("task-mode").value === "agent") body.session_id = identifier;
   if (selected.size) body.document_ids = [...selected];
   $("ask-button").disabled = true; $("result").hidden = true; setAnalyzing(true); status("正在检索资料并整理回答…");
   try {
     const result = await post(`/api/${$("task-mode").value}`, body, {signal: questionController.signal});
-    if (courseId !== currentCourse || epoch !== scopeEpoch || askId !== askEpoch) return;
+    if (courseId !== currentCourse || epoch !== scopeEpoch || askId !== askEpoch || identifier !== activeSession) return;
     renderResult(result);
+    if (result.session_id) await loadSession();
     status("处理完成。");
   } catch (error) { if (error.name !== "AbortError" && askId === askEpoch) status(error.message, true); }
   finally { if (askId === askEpoch) { $("ask-button").disabled = false; setAnalyzing(false); } }
@@ -210,7 +253,7 @@ function renderResult(result) {
     }
     refreshProgress().catch(() => {});
     $("answer").textContent = result.answer; $("warning").textContent = result.warning || "";
-    $("timing").textContent = `${result.trace ? `工具 ${result.trace.length} 次 · ` : ""}总计 ${Math.round(result.total_ms || 0)} ms`;
+    $("timing").textContent = `${result.trace ? `工具 ${result.trace.length} 次 · ` : ""}总计 ${Math.round(result.total_ms || 0)} ms${result.usage?.total_tokens ? ` · 模型报告用量 ${result.usage.total_tokens} tokens` : ""}`;
     $("trace").replaceChildren();
     $("trace-panel").hidden = !result.trace?.length;
     for (const step of result.trace || []) {
@@ -383,6 +426,7 @@ function renderArtifact(artifact) {
   const target = $("artifact-content"); target.replaceChildren();
   if (artifact.coverage?.units) {
     target.append(element("p", `本次覆盖 ${artifact.coverage.documents.length} 份资料 · ${artifact.coverage.units.length} 个章节/小节 · 分段读取 ${artifact.coverage.read_chunks} 个正文片段。`, "scope-summary"));
+    if (artifact.coverage.cached_summaries) target.append(element("p", `沿用 ${artifact.coverage.cached_summaries} 段已完成的整理，继续生成本次结果。`, "hint"));
   }
   const refs = (ids) => element("p", "依据：" + ids.map(id => `[${id}]`).join(" "), "hint");
   for (const section of artifact.content.sections) {
@@ -712,7 +756,7 @@ $("drop-zone").addEventListener("drop", event => {
   const transfer = new DataTransfer(); files.forEach(file => transfer.items.add(file));
   $("files").files = transfer.files; updateFiles();
 });
-function updateScope() { $("scope-note").textContent = !currentCourse ? "尚未选择课程 · 资料为空" : selected.size ? `已勾选 ${selected.size} 份 · 限定检索与生成范围` : "未勾选 · 使用当前课程全部资料"; }
+function updateScope() { $("scope-note").textContent = !currentCourse ? "尚未选择课程 · 资料为空" : selected.size ? `已勾选 ${selected.size} 份 · 限定检索与生成范围` : "未勾选 · 使用当前课程全部资料"; synchronizeSession(); }
 function setAnalyzing(active) {
   clearInterval(requestTimer);
   $("analysis-progress").hidden = !active;
