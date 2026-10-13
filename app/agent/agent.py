@@ -23,6 +23,7 @@ class StudyAgent:
         if self.memory and getattr(request, "session_id", None):
             with self.memory.turn(request) as (entry, history, reset):
                 result = self._run(request, history)
+                result.conversation_id = uuid4().hex
                 self.memory.remember(entry, request, result, self.registry.generation)
                 result.session_id, result.context_turns, result.context_reset = (
                     request.session_id,

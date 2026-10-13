@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/courses", tags=["courses"])
 
 @router.post("", response_model=CourseOut, status_code=201)
 def create_course(body: CourseCreate, request: Request):
-    with request.app.state.sessions() as session:
+    with request.state.services.sessions() as session:
         course = Course(name=body.name.strip(), description=body.description)
         session.add(course)
         session.commit()
@@ -19,11 +19,11 @@ def create_course(body: CourseCreate, request: Request):
 
 @router.get("", response_model=list[CourseOut])
 def list_courses(request: Request):
-    with request.app.state.sessions() as session:
+    with request.state.services.sessions() as session:
         return list(session.scalars(select(Course).order_by(Course.created_at.desc())))
 
 
 @router.delete("/{course_id}")
 def remove_course(course_id: str, request: Request):
-    with request.app.state.connection.exclusive_task():
-        return delete_course(request.app.state, course_id)
+    with request.state.services.connection.exclusive_task():
+        return delete_course(request.state.services, course_id)

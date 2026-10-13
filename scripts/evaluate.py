@@ -23,7 +23,7 @@ def evaluate(mode: str, output: Path):
     results = []
     with tempfile.TemporaryDirectory(prefix="studyagent-eval-") as directory:
         root = Path(directory)
-        settings = Settings(study_mode=mode, data_dir=root / "db")
+        settings = Settings(auth_enabled=False, study_mode=mode, data_dir=root / "db")
         with TestClient(create_app(settings)) as client:
             course = client.post("/api/courses", json={"name": "自编测试课程"}).json()["id"]
             ids, chunk_count = {}, 0

@@ -43,7 +43,7 @@ def test_exact_200mb_boundary_and_oversize_cleanup(exam_app, monkeypatch):
 
     # Test upload storage's size boundary without running a parser on synthetic bytes.
     monkeypatch.setattr(app.state.ingestion, "process", lambda identifier: {"id": identifier})
-    request = SimpleNamespace(app=app)
+    request = SimpleNamespace(app=app, state=SimpleNamespace(services=app.state))
     root = app.state.settings.data_dir / "uploads"
     limit = 200 * 1024 * 1024
     uploaded = upload_document(

@@ -52,6 +52,7 @@ class ToolTrace(BaseModel):
 
 
 class AgentResponse(BaseModel):
+    conversation_id: str | None = None
     session_id: str | None = None
     context_turns: int = 0
     context_reset: bool = False

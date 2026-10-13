@@ -25,7 +25,7 @@ def main():
     )
     args = parser.parse_args()
     profile = json.loads(Path("data/model-connection.json").read_text(encoding="utf-8"))
-    settings = Settings(
+    settings = Settings(auth_enabled=False,
         _env_file=None, data_dir=Path("data/model-learning-smoke"), min_similarity=0
     )
     app = create_app(settings)

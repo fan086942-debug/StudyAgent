@@ -89,6 +89,7 @@ class AgentMemory:
 
     def remember(self, entry, request, result, generation):
         turn = dict(
+            id=result.conversation_id,
             question=request.question,
             answer=result.answer[:4000],
             topics=[],
@@ -140,3 +141,15 @@ class AgentMemory:
             return dict(
                 session_id=request.session_id, turns=deepcopy(entry.turns), context_reset=reset
             )
+
+    @contextmanager
+    def deleting_conversation(self, course_id, session_id):
+        """Commit the deletion before dropping its dependent context; exclude active turns."""
+        with self.lock:
+            entry = self.entries.get(session_id)
+            matches = entry is not None and entry.scope[0] == course_id
+            if matches and entry.busy:
+                raise AppError("session_busy", "该对话正在生成回答，请处理完成后再删除。", 409)
+            yield matches
+            if matches:
+                del self.entries[session_id]

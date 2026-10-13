@@ -2,20 +2,23 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from app.core.errors import AppError
-from app.rag.parsers.docx import parse_docx
-from app.rag.parsers.pdf import parse_pdf
-from app.rag.parsers.pptx import parse_pptx
 from app.schemas.document import ParsedDocument
 
 
 def parse_document(
     path: Path, *, settings=None, cache_dir=None, digest=None, progress=None, cancel=None
 ) -> ParsedDocument:
-    parsers = {".pdf": parse_pdf, ".pptx": parse_pptx, ".docx": parse_docx}
-    parser = parsers.get(path.suffix.lower())
-    if parser is None:
+    suffix = path.suffix.lower()
+    if suffix not in {".pdf", ".pptx", ".docx"}:
         raise AppError("unsupported_type", "仅支持文本 PDF、PPTX、DOCX；旧格式请先转换")
     try:
+        if suffix == ".pdf":
+            from app.rag.parsers.pdf import parse_pdf as parser
+        elif suffix == ".pptx":
+            from app.rag.parsers.pptx import parse_pptx as parser
+        else:
+            from app.rag.parsers.docx import parse_docx as parser
+
         if cancel:
             cancel()
         if path.suffix.lower() != ".pdf":
@@ -24,7 +27,7 @@ def parse_document(
                 if sum(item.file_size for item in archive.infolist()) > 200 * 1024 * 1024:
                     raise AppError("document_too_large", "文档解压后超过 200MB，请拆分上传")
         result = (
-            parse_pdf(
+            parser(
                 path,
                 ocr_enabled=settings.ocr_enabled if settings else True,
                 ocr_dpi=settings.ocr_dpi if settings else 180,

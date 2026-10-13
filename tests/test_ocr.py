@@ -120,7 +120,8 @@ def test_queued_job_keeps_request_guard_and_busy_retry(exam_app):
     app, client, course, identifier = exam_app
     from types import SimpleNamespace
 
-    request, tasks, response = SimpleNamespace(app=app), BackgroundTasks(), Response()
+    request = SimpleNamespace(app=app, state=SimpleNamespace(services=app.state))
+    tasks, response = BackgroundTasks(), Response()
     queued = queue_document(request, identifier, tasks, response)
     assert queued.status == "processing" and response.status_code == 202
     assert app.state.connection.active_requests == 1

@@ -1,0 +1,9 @@
+{
+  "history_delete": true,
+  "cancel_keeps_record": true,
+  "session_delete": true,
+  "dependent_context_reset": true,
+  "persists_after_reload": true,
+  "mobile_no_overflow": true,
+  "javascript_errors": []
+}

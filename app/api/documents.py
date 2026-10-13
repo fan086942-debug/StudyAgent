@@ -46,7 +46,7 @@ def process_uploaded(state, identifier):
 
 
 def queue_document(request, identifier, tasks, response):
-    state = request.app.state
+    state = request.state.services
     if state.ingestion.lock.locked():
         raise AppError("ingestion_busy", "已有资料正在处理，请稍后重试", 409)
     with state.ingestion.control_lock, state.sessions() as session:
@@ -68,7 +68,7 @@ def queue_document(request, identifier, tasks, response):
 
 @router.get("/courses/{course_id}/documents", response_model=list[DocumentOut])
 def list_documents(course_id: str, request: Request):
-    with request.app.state.sessions() as session:
+    with request.state.services.sessions() as session:
         if session.get(Course, course_id) is None:
             raise AppError("course_not_found", "课程不存在", 404)
         return list(
@@ -95,15 +95,15 @@ def upload_document(
     response: Response = None,
     background: Annotated[bool, Form()] = False,
 ):
-    settings = request.app.state.settings
+    settings = request.state.services.settings
     name = (file.filename or "upload").replace("\\", "/").split("/")[-1][:255]
     suffix = Path(name).suffix.lower()
     if suffix not in {".pdf", ".pptx", ".docx"}:
         raise AppError("unsupported_type", "仅支持 PDF、PPTX、DOCX；PPT/DOC 请先转换", 415)
-    with request.app.state.sessions() as session:
+    with request.state.services.sessions() as session:
         if session.get(Course, course_id) is None:
             raise AppError("course_not_found", "课程不存在", 404)
-        if request.app.state.ingestion.lock.locked():
+        if request.state.services.ingestion.lock.locked():
             raise AppError("ingestion_busy", "已有资料正在处理，请稍后上传", 409)
         identifier = uuid4().hex
         directory = settings.data_dir / "uploads"
@@ -142,11 +142,11 @@ def upload_document(
     try:
         if background:
             return queue_document(request, identifier, background_tasks, response)
-        return request.app.state.ingestion.process(identifier)
+        return request.state.services.ingestion.process(identifier)
     except AppError as exc:
         # 与另一个上传恰好竞争时，已保存的文件应能重试，而非永远 processing。
         if exc.code == "ingestion_busy":
-            with request.app.state.sessions() as session:
+            with request.state.services.sessions() as session:
                 doc = session.get(Document, identifier)
                 doc.status, doc.error = "failed", exc.message
                 session.commit()
@@ -167,35 +167,35 @@ def retry(
 ):
     if background:
         return queue_document(request, document_id, background_tasks, response)
-    with request.app.state.sessions() as session:
+    with request.state.services.sessions() as session:
         doc = session.get(Document, document_id)
         if doc is not None and (
             doc.status == "cancelling" or (doc.status == "processing" and doc.warning)
         ):
             raise AppError("document_busy", "资料正在处理或停止中，请稍后再重试", 409)
-    return request.app.state.ingestion.process(document_id)
+    return request.state.services.ingestion.process(document_id)
 
 
 @router.delete("/documents/{document_id}")
 def delete_document(document_id: str, request: Request):
-    return request.app.state.ingestion.delete(document_id)
+    return request.state.services.ingestion.delete(document_id)
 
 
 @router.post("/documents/{document_id}/cancel", response_model=DocumentOut, status_code=202)
 def cancel_processing(document_id: str, request: Request):
-    return request.app.state.ingestion.cancel(document_id)
+    return request.state.services.ingestion.cancel(document_id)
 
 
 @router.get("/documents/{document_id}/file")
 def download(document_id: str, request: Request):
-    with request.app.state.sessions() as session:
+    with request.state.services.sessions() as session:
         doc = session.get(Document, document_id)
         if doc is None:
             raise AppError("document_not_found", "资料不存在", 404)
         if doc.status == "deleting":
             raise AppError("document_deleting", "资料已停止使用，正在删除", 409)
         path = Path(doc.storage_path).resolve()
-        if not path.is_relative_to((request.app.state.settings.data_dir / "uploads").resolve()):
+        if not path.is_relative_to((request.state.services.settings.data_dir / "uploads").resolve()):
             raise AppError("invalid_file_path", "资料存储路径异常", 500)
         if not path.exists():
             raise AppError("file_missing", "原文件已丢失", 404)

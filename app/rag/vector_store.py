@@ -1,5 +1,4 @@
-import chromadb
-from chromadb.config import Settings as ChromaSettings
+from threading import RLock
 
 from app.core.config import Settings
 from app.core.errors import AppError
@@ -7,15 +6,40 @@ from app.core.errors import AppError
 
 class VectorStore:
     def __init__(self, settings: Settings, fingerprint: str):
-        self.client = chromadb.PersistentClient(
-            path=str(settings.data_dir / "chroma"),
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
-        self.collection = self.client.get_or_create_collection(
-            name="chunks-" + fingerprint,
-            embedding_function=None,
-            configuration={"hnsw": {"space": "cosine"}},
-        )
+        self.settings, self.fingerprint = settings, fingerprint
+        self._client = self._collection = None
+        self._lock = RLock()
+
+    @property
+    def client(self):
+        with self._lock:
+            if self._client is None:
+                import chromadb
+                from chromadb.config import Settings as ChromaSettings
+
+                self._client = chromadb.PersistentClient(
+                    path=str(self.settings.data_dir / "chroma"),
+                    settings=ChromaSettings(anonymized_telemetry=False),
+                )
+            return self._client
+
+    @property
+    def collection(self):
+        with self._lock:
+            if self._collection is None:
+                self._collection = self.client.get_or_create_collection(
+                    name="chunks-" + self.fingerprint,
+                    embedding_function=None,
+                    configuration={"hnsw": {"space": "cosine"}},
+                )
+            return self._collection
+
+    def close(self):
+        # Closing an unused store must not import or initialize Chroma.
+        with self._lock:
+            if self._client is not None:
+                self._client.close()
+                self._client = self._collection = None
 
     def delete_document(self, document_id: str):
         try:

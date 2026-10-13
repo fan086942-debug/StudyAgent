@@ -4,13 +4,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
 
-import httpx
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from app.api.agent import router as agent_router
+from app.api.auth import router as auth_router
 from app.api.chat import router as chat_router
 from app.api.connection import router as connection_router
 from app.api.courses import router as courses_router
@@ -21,11 +22,9 @@ from app.api.learning import router as learning_router
 from app.api.material_learning import router as material_learning_router
 from app.core.config import Settings
 from app.core.errors import AppError
-from app.db.session import make_database
-from app.rag.embedding import APIEmbedding, DemoEmbedding
-from app.rag.retriever import Retriever
-from app.rag.vector_store import VectorStore
-from app.services.connection import ModelConnection
+from app.core.http import LazyHTTPClient
+from app.services.auth import COOKIE, AuthService
+from app.services.workspaces import Workspaces, initialize_workspace
 
 logger = logging.getLogger("studyagent")
 
@@ -41,30 +40,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        engine, sessions = make_database(settings.data_dir)
-        app.state.sessions = sessions
-        with httpx.Client(timeout=settings.request_timeout, follow_redirects=False) as client:
-            app.state.http = client
-            embeddings = (
-                DemoEmbedding(settings)
-                if settings.study_mode == "demo"
-                else APIEmbedding(settings, client)
-            )
-            vectors = VectorStore(settings, embeddings.fingerprint)
-            app.state.embeddings, app.state.vectors = embeddings, vectors
-            app.state.retriever = Retriever(settings, sessions, embeddings, vectors)
-            app.state.connection = ModelConnection(app.state, settings)
-            app.state.exams.recover_interrupted()
-            app.state.ingestion.recover_interrupted()
-            app.state.ingestion.mark_stale()
+        started = time.perf_counter()
+        with LazyHTTPClient(settings.request_timeout) as client:
+            if settings.auth_enabled:
+                app.state.auth = AuthService(settings)
+                app.state.workspaces = Workspaces(settings, client)
+            else:
+                initialize_workspace(app.state, settings, client)
+                app.state.workspaces = Workspaces(settings, client, app.state)
+                app.state.workspaces.states["legacy"] = app.state
+            app.state.startup_ms = round((time.perf_counter() - started) * 1000, 1)
+            logger.info("startup ready elapsed_ms=%.1f vector_index=lazy", app.state.startup_ms)
             try:
                 yield
             finally:
-                vectors.client.close()
-                engine.dispose()
+                app.state.workspaces.close()
+                if settings.auth_enabled:
+                    app.state.auth.engine.dispose()
 
     app = FastAPI(title="StudyAgent", version="0.4.0", lifespan=lifespan)
     app.state.settings = settings
+    app.include_router(auth_router)
     app.include_router(courses_router)
     app.include_router(documents_router)
     app.include_router(chat_router)
@@ -85,15 +81,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def request_log(request: Request, call_next):
         request.state.request_id = uuid4().hex
         start = time.perf_counter()
-        connection = getattr(app.state, "connection", None)
-        guarded = bool(
-            connection
-            and request.url.path.startswith("/api/")
-            and not request.url.path.startswith("/api/connection")
-        )
+        connection = None
         entered = False
         try:
-            if guarded:
+            path = request.url.path
+            is_api = path.startswith("/api/")
+            is_auth = path.startswith("/api/auth/")
+            if settings.auth_enabled and is_api and request.method not in {"GET", "HEAD", "OPTIONS"}:
+                origin = request.headers.get("origin")
+                if ((origin and origin != str(request.base_url).rstrip("/"))
+                        or request.headers.get("sec-fetch-site") == "cross-site"):
+                    raise AppError("origin_forbidden", "请从当前站点提交操作", 403)
+            request.state.services = app.state
+            if settings.auth_enabled and is_api and not is_auth:
+                user = await run_in_threadpool(
+                    app.state.auth.authenticate, request.cookies.get(COOKIE)
+                )
+                if user is None:
+                    raise AppError("login_required", "请先登录后继续", 401)
+                request.state.user = user
+                request.state.services = await run_in_threadpool(app.state.workspaces.get, user)
+            connection = getattr(request.state.services, "connection", None)
+            if connection and is_api and not is_auth and not path.startswith("/api/connection"):
                 connection.enter_request()
                 entered = True
             response = await call_next(request)
@@ -122,6 +131,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if entered:
                 connection.leave_request()
         response.headers["X-Request-ID"] = request.state.request_id
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
         logger.info(
             "request=%s method=%s path=%s status=%s elapsed_ms=%.1f",
             request.state.request_id,
@@ -164,6 +175,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "version": "0.4.0",
             "max_upload_mb": settings.max_upload_mb,
             "ocr_enabled": settings.ocr_enabled,
+            "auth_enabled": settings.auth_enabled,
+            "startup_ms": app.state.startup_ms,
         }
 
     return app

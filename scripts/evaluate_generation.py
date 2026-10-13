@@ -36,7 +36,7 @@ def evaluate(mode):
     rows = []
     with tempfile.TemporaryDirectory(prefix="study-generation-", ignore_cleanup_errors=True) as tmp:
         root = Path(tmp)
-        settings = Settings(
+        settings = Settings(auth_enabled=False,
             _env_file=".env" if mode == "api" else None,
             study_mode=mode,
             data_dir=root / "db",

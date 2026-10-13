@@ -319,8 +319,10 @@ class LearningService:
             return self._plan_out(plan)
 
     def save_conversation(self, request, kind, result):
+        result.conversation_id = result.conversation_id or new_id()
         with self.sessions() as session:
             row = Conversation(
+                id=result.conversation_id,
                 course_id=request.course_id,
                 question=request.question,
                 kind=kind,
@@ -357,3 +359,12 @@ class LearningService:
                 "document_ids": row.document_ids,
                 "result": row.payload,
             }
+
+    def delete_conversation(self, course_id, conversation_id):
+        self.exams.validate_scope(course_id, None)
+        with self.lock, self.sessions() as session:
+            row = session.get(Conversation, conversation_id)
+            if row is None or row.course_id != course_id:
+                raise AppError("conversation_not_found", "当前课程中没有这条对话", 404)
+            session.delete(row)
+            session.commit()

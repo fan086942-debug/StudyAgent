@@ -4,7 +4,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from threading import Lock, RLock
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 
 from app.core.errors import AppError
 from app.models import (
@@ -253,8 +253,13 @@ class IngestionService:
 
     def mark_stale(self):
         with self.sessions() as session:
-            docs = session.scalars(select(Document).where(Document.status == "ready"))
-            for doc in docs:
-                if doc.embedding_fingerprint != self.embeddings.fingerprint:
-                    doc.status, doc.error = "stale", "Embedding 配置已改变，请重新索引"
+            session.execute(
+                update(Document)
+                .where(
+                    Document.status == "ready",
+                    or_(Document.embedding_fingerprint.is_(None),
+                        Document.embedding_fingerprint != self.embeddings.fingerprint),
+                )
+                .values(status="stale", error="Embedding 配置已改变，请重新索引")
+            )
             session.commit()

@@ -27,6 +27,7 @@ class SearchResponse(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    conversation_id: str | None = None
     answer: str
     sources: list[Source]
     mode: str

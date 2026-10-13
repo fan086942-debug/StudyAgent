@@ -16,7 +16,8 @@ from tests.test_exams import exam_bytes
 def test_cancel_queued_job_before_it_starts(exam_app):
     app, client, course, identifier = exam_app
     response = Response()
-    queue_document(SimpleNamespace(app=app), identifier, BackgroundTasks(), response)
+    request = SimpleNamespace(app=app, state=SimpleNamespace(services=app.state))
+    queue_document(request, identifier, BackgroundTasks(), response)
     assert response.status_code == 202
     try:
         result = client.post(f"/api/documents/{identifier}/cancel")

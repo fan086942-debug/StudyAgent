@@ -8,14 +8,14 @@ router = APIRouter(prefix="/api/courses/{course_id}", tags=["learning"])
 
 @router.get("/progress")
 def progress(course_id: str, request: Request):
-    return request.app.state.learning.progress(
+    return request.state.services.learning.progress(
         SearchRequest(course_id=course_id, question="学习进度")
     )
 
 
 @router.post("/practice", status_code=201)
 def practice(course_id: str, body: PracticeRequest, request: Request):
-    return request.app.state.learning.record_practice(course_id, body)
+    return request.state.services.learning.record_practice(course_id, body)
 
 
 @router.get("/wrongbook")
@@ -26,19 +26,19 @@ def wrongbook(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
-    return request.app.state.learning.wrong_questions(
+    return request.state.services.learning.wrong_questions(
         SearchRequest(course_id=course_id, question="错题"), include_mastered, limit, offset
     )
 
 
 @router.patch("/wrongbook/{wrong_id}")
 def update_wrong(course_id: str, wrong_id: str, body: WrongUpdate, request: Request):
-    return request.app.state.learning.update_wrong(course_id, wrong_id, body.mastered)
+    return request.state.services.learning.update_wrong(course_id, wrong_id, body.mastered)
 
 
 @router.post("/plans", status_code=201)
 def create_plan(course_id: str, body: PlanRequest, request: Request):
-    return request.app.state.learning.create_plan(
+    return request.state.services.learning.create_plan(
         SearchRequest(course_id=course_id, question="复习计划", document_ids=body.document_ids),
         body,
     )
@@ -51,12 +51,12 @@ def plans(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
-    return request.app.state.learning.plans(course_id, limit, offset)
+    return request.state.services.learning.plans(course_id, limit, offset)
 
 
 @router.patch("/plans/{plan_id}/tasks/{task_id}")
 def update_task(course_id: str, plan_id: str, task_id: str, body: TaskUpdate, request: Request):
-    return request.app.state.learning.update_task(course_id, plan_id, task_id, body.completed)
+    return request.state.services.learning.update_task(course_id, plan_id, task_id, body.completed)
 
 
 @router.get("/conversations")
@@ -66,9 +66,20 @@ def conversations(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
-    return request.app.state.learning.conversations(course_id, limit, offset)
+    return request.state.services.learning.conversations(course_id, limit, offset)
 
 
 @router.get("/conversations/{conversation_id}")
 def conversation(course_id: str, conversation_id: str, request: Request):
-    return request.app.state.learning.conversation(course_id, conversation_id)
+    return request.state.services.learning.conversation(course_id, conversation_id)
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(course_id: str, conversation_id: str, request: Request):
+    state = request.state.services
+    record = state.learning.conversation(course_id, conversation_id)
+    with state.agent_memory.deleting_conversation(
+        course_id, record["result"].get("session_id")
+    ) as reset:
+        state.learning.delete_conversation(course_id, conversation_id)
+    return {"deleted": conversation_id, "context_reset": reset}

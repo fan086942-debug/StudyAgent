@@ -124,14 +124,15 @@ class ModelConnection:
             return self._description()
 
     def _description(self):
+        embedding_settings = getattr(self.state, "embedding_settings", self.defaults)
         return {
             "mode": self.profile.mode,
             "base_url": self.profile.base_url,
             "model": self.profile.model,
             "has_api_key": bool(self.profile.api_key.get_secret_value()),
-            "embedding_mode": self.defaults.study_mode,
-            "embedding_model": self.defaults.embedding_model
-            if self.defaults.study_mode == "api"
+            "embedding_mode": embedding_settings.study_mode,
+            "embedding_model": embedding_settings.embedding_model
+            if embedding_settings.study_mode == "api"
             else "本地字词检索",
         }
 

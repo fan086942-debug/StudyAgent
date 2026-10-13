@@ -1,0 +1,48 @@
+{
+  "registration": true,
+  "drag_upload": true,
+  "agent_chain": true,
+  "wrongbook_and_self_assessment": true,
+  "plan_checklist": true,
+  "generated_practice_and_download": true,
+  "persistence_and_history": true,
+  "theme_persistence": true,
+  "course_race_guard": true,
+  "responsive_widths": [
+    320,
+    375,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "reduced_motion": true,
+  "logout": true,
+  "login_and_account_persistence": true,
+  "expired_session_gate": true,
+  "javascript_errors": 0,
+  "startup": {
+    "before_import_seconds": 15.797,
+    "after_import_seconds": 1.03,
+    "ready_seconds": 1.207,
+    "lifespan_ms": 115.1,
+    "chroma_imported": false,
+    "pdfium_imported": false,
+    "http_initialized": false
+  },
+  "validation": {
+    "full_suite_passed": 183,
+    "targeted_latest_passed": 10,
+    "ruff": "passed",
+    "git_diff_check": "passed"
+  },
+  "legacy_learning_data_before_and_after": {
+    "courses": 2,
+    "documents": 3,
+    "chunks": 713,
+    "conversations": 7,
+    "study_artifacts": 1,
+    "wrong_questions": 0,
+    "study_plans": 0
+  }
+}

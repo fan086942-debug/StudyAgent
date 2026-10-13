@@ -39,7 +39,7 @@ def simulated_model(request):
 
 
 def create_preview():
-    app = create_app(Settings(_env_file=None, data_dir=Path("data/connection-browser-check")))
+    app = create_app(Settings(auth_enabled=False, _env_file=None, data_dir=Path("data/connection-browser-check")))
     original = app.router.lifespan_context
 
     @asynccontextmanager

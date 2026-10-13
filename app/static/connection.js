@@ -33,6 +33,7 @@
   }
   async function openConnection() {
     if (busy) return;
+    if (window.studyAuth && !window.studyAuth.require("登录后，配置你的学习模型。")) return;
     if (!dialog.open) dialog.showModal();
     message("正在读取连接设置…");
     setBusy(true);

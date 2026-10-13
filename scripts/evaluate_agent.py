@@ -23,7 +23,7 @@ def evaluate(mode: str) -> dict:
     )
     with tempfile.TemporaryDirectory(prefix="studyagent-eval-", ignore_cleanup_errors=True) as temp:
         root = Path(temp)
-        settings = Settings(
+        settings = Settings(auth_enabled=False,
             _env_file=".env" if mode == "api" else None, study_mode=mode, data_dir=root / "db"
         )
         rows = []

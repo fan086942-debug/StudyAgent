@@ -34,6 +34,7 @@ async function loadSession() {
   for (const turn of result.turns) {
     const card = element("article", undefined, "session-turn");
     card.append(element("strong", turn.question), element("p", turn.answer, "question-text"));
+    if (turn.id) card.append(conversationDeleteButton(currentCourse, turn.id));
     $("session-turns").append(card);
   }
   $("session-count").textContent = result.turns.length ? `当前对话 · 已串联 ${result.turns.length} 轮` : "新对话 · 可以连续追问";
@@ -45,17 +46,42 @@ $("new-session").addEventListener("click", () => {
   $("question").value = ""; updateQuestionCount(); status("已开启新对话，之前的问答仍可在学习记录中查看。");
 });
 
+function conversationDeleteButton(course, identifier) {
+  const remove = element("button", "删除对话", "link-button document-delete"); remove.type = "button";
+  remove.addEventListener("click", async () => {
+    if (!confirm("删除这条对话记录？若它属于仍保留的临时会话，该会话的上下文也会重置。")) return;
+    const epoch = scopeEpoch;
+    remove.disabled = true;
+    try {
+      const result = await api(`/api/courses/${course}/conversations/${identifier}`, {method: "DELETE"});
+      if (course !== currentCourse || epoch !== scopeEpoch) return;
+      $("result").hidden = true;
+      await Promise.all([loadHistory(), loadSession().catch(() => {})]);
+      status(result.context_reset ? "对话已删除，对应的临时上下文已重置。" : "对话记录已删除。");
+    } catch (error) { if (course === currentCourse && epoch === scopeEpoch) status(error.message, true); }
+    finally { remove.disabled = false; }
+  });
+  return remove;
+}
+
 function status(message, error = false) {
   $("status").textContent = message;
   $("status").className = error ? "error" : "";
   if (message) notify(message, error);
 }
 async function api(path, options = {}) {
+  const scoped = path.startsWith("/api/") && !path.startsWith("/api/auth/");
+  if (scoped && window.studyAuth && !window.studyAuth.require()) {
+    throw new Error("请登录后继续。");
+  }
+  const authEpoch = window.studyAuth?.epoch;
   let response;
   try { response = await fetch(path, options); }
   catch (error) { if (error.name === "AbortError") throw error; throw new Error("无法连接学习服务，请确认服务正在运行。"); }
   let data;
   try { data = await response.json(); } catch { throw new Error("服务返回了无法读取的响应，请重试。"); }
+  if (scoped && authEpoch !== window.studyAuth?.epoch) throw new DOMException("账号已切换，请求已取消。", "AbortError");
+  if (response.status === 401 && !path.startsWith("/api/auth/")) window.showAuthGate?.();
   if (!response.ok) throw new Error((data.message || "请求失败，请检查输入并重试。") + (data.usage?.total_tokens ? ` · 模型报告用量 ${data.usage.total_tokens} tokens` : "") + (data.request_id ? `（请求 ${data.request_id.slice(0, 8)}）` : ""));
   return data;
 }
@@ -83,6 +109,7 @@ async function loadCourses(preferred) {
   const desired = preferred || stored;
   $("course").value = desired && courses.some(c => c.id === desired) ? desired : "";
   currentCourse = $("course").value;
+  $("create-course").open = !courses.length;
   $("course-delete-open").hidden = !currentCourse;
   selected.clear();
   resetLearning();
@@ -95,6 +122,7 @@ async function loadDocuments() {
   const courseId = currentCourse;
   if (!courseId) {
     libraryDocuments = [];
+    $("welcome").hidden = false;
     $("upload-button").disabled = false;
     selected.clear(); $("document-count").textContent = "0"; updateScope();
     $("documents").replaceChildren(element("p", "资料库是空的。创建或选择一门课程，上传你的第一份资料。", "empty"));
@@ -108,6 +136,7 @@ async function loadDocuments() {
   const documents = await api(`/api/courses/${courseId}/documents`);
   if (courseId === currentCourse && epoch === scopeEpoch) libraryDocuments = documents;
   if (courseId !== currentCourse || epoch !== scopeEpoch) return;
+  $("welcome").hidden = documents.some(doc => doc.status === "ready");
   const processing = documents.some(doc => ["processing", "cancelling"].includes(doc.status));
   const pendingIds = documents.filter(doc => ["processing", "cancelling"].includes(doc.status)).map(doc => doc.id);
   $("upload-button").disabled = processing;
@@ -360,6 +389,7 @@ async function start() {
     maxUploadMb = health.max_upload_mb || 200;
     document.querySelector(".upload-hint").textContent = `${health.ocr_enabled ? "扫描 PDF 自动 OCR" : "文本型文件"} · 单文件上限 ${maxUploadMb} MB`;
     updateModelMode(health.mode);
+    try { const profile = await api("/api/connection"); updateModelMode(profile.mode, profile.model); } catch {}
     await loadCourses();
   } catch (error) { status(error.message, true); }
 }
@@ -369,7 +399,7 @@ function updateModelMode(mode, model = "") {
   $("mode").textContent = demo ? "演示模式 · 连接模型 ↗" : "API 模式 ↗";
   $("mode").classList.toggle("live", !demo);
   $("mode").title = demo ? "点击配置模型 API" : `${model || "模型 API"} · 点击管理连接`;
-  $("mode-note").textContent = demo ? "当前为离线演示：回答是原文摘录。点击右上角模式或左侧「模型连接」，配置 API 即可使用真实模型。" : `已启用${model ? ` ${model} ` : ""}模型 API，Agent 将自主选择工具。回答基于上传资料，请对照引用原文核查。`;
+  $("mode-note").textContent = demo ? "演示模式：使用资料原文摘录。连接模型后，可获得完整的分析与回答。" : `已连接${model ? ` ${model}` : "学习模型"}。回答基于资料，可查看引用原文。`;
 }
 
 
@@ -624,7 +654,9 @@ const motion = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "i
 
 function showView(view, scroll = true) {
   if (!viewNames[view]) return;
+  const changed = activeView !== view;
   activeView = view;
+  if (location.hash !== `#${view}`) history.replaceState(null, "", `#${view}`);
   document.querySelectorAll("[data-panel]").forEach(panel => { panel.hidden = panel.dataset.panel !== view; });
   document.querySelectorAll(".nav-item").forEach(button => {
     const active = button.dataset.view === view;
@@ -632,6 +664,11 @@ function showView(view, scroll = true) {
     if (active) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current");
   });
   $("view-label").textContent = viewNames[view];
+  if (changed && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const panel = document.querySelector(`[data-panel="${view}"]`);
+    panel.getAnimations().forEach(animation => animation.cancel());
+    panel.animate([{opacity: 0, transform: "translateY(8px)"}, {opacity: 1, transform: "translateY(0)"}], {duration: 220, easing: "cubic-bezier(.2,.7,.2,1)"});
+  }
   closeSidebar();
   if (scroll) window.scrollTo({top: 0, behavior: motion()});
   if (view === "learning") loadLearning().catch(error => status(error.message, true));
@@ -715,6 +752,7 @@ function renderCommands() {
   if (!$("command-results").children.length) $("command-results").append(element("p", "没有匹配的操作，试试“复习”或“题库”。", "empty"));
 }
 function openCommands() {
+  if ($("auth-screen").open) return;
   $("command-search").value = ""; renderCommands();
   if (!$("command-dialog").open) $("command-dialog").showModal();
   $("command-search").focus();
@@ -758,10 +796,11 @@ $("drop-zone").addEventListener("drop", event => {
 });
 function updateScope() { $("scope-note").textContent = !currentCourse ? "尚未选择课程 · 资料为空" : selected.size ? `已勾选 ${selected.size} 份 · 限定检索与生成范围` : "未勾选 · 使用当前课程全部资料"; synchronizeSession(); }
 function setAnalyzing(active) {
+  $("agent-availability").textContent = active ? "正在思考" : document.body.dataset.auth === "guest" ? "登录后启用" : "准备就绪";
   clearInterval(requestTimer);
   $("analysis-progress").hidden = !active;
   $("question-form").setAttribute("aria-busy", String(active));
-  $("ask-button").textContent = active ? "正在分析…" : "开始分析 ↗";
+  $("ask-button").textContent = active ? "正在分析…" : document.body.dataset.auth === "guest" ? "登录后提问" : "发送问题";
   if (active) {
     const begun = performance.now(); $("elapsed-label").textContent = "0 秒";
     requestTimer = setInterval(() => { $("elapsed-label").textContent = `${Math.floor((performance.now() - begun) / 1000)} 秒`; }, 1000);
@@ -1037,7 +1076,7 @@ async function loadHistory(append = false) {
         $("result").scrollIntoView({behavior: motion(), block: "start"}); status("已打开历史回答与来源快照。");
       } catch (error) { status(error.message, true); }
       finally { button.disabled = false; }
-    }); row.append(text, button); $("conversation-history").append(row);
+    }); row.append(text, button, conversationDeleteButton(course, record.id)); $("conversation-history").append(row);
   }
   historyOffset = offset + records.length; $("more-history").hidden = records.length < 20;
   if (!historyOffset) $("conversation-history").append(element("p", "好问题值得留下。完成一次资料问答，记录将自动保存在这里。", "empty"));
@@ -1048,4 +1087,4 @@ $("copy-answer").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText($("answer").textContent); notify("回答已复制。"); }
   catch { status("浏览器未允许剪贴板访问，可选中回答手动复制。", true); }
 });
-start();
+window.addEventListener("hashchange", () => showView(location.hash.slice(1) || "study", false));

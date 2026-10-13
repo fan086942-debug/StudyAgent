@@ -5,6 +5,9 @@ from app.schemas.connection import ConnectionInput
 
 
 def local_access(request: Request):
+    if request.app.state.settings.auth_enabled:
+        # Authenticated accounts configure only their own workspace.
+        return
     loopback = {"127.0.0.1", "localhost", "::1"}
     if (
         not request.client
@@ -26,14 +29,14 @@ router = APIRouter(
 
 @router.get("")
 def read_connection(request: Request):
-    return request.app.state.connection.describe()
+    return request.state.services.connection.describe()
 
 
 @router.put("")
 def save_connection(body: ConnectionInput, request: Request):
-    return request.app.state.connection.save(body)
+    return request.state.services.connection.save(body)
 
 
 @router.post("/test")
 def test_connection(body: ConnectionInput, request: Request):
-    return request.app.state.connection.test(body)
+    return request.state.services.connection.test(body)
