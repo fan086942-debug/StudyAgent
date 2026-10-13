@@ -242,7 +242,7 @@ class ToolRegistry:
                 usage=artifact.usage,
             )
         if name in {"search_knowledge", "locate_source"}:
-            return ToolResult(sources=self._knowledge(args.query, context))
+            return ToolResult(sources=self._knowledge(args.query, context, locate=name == "locate_source"))
         if name == "search_questions":
             questions = self.exams.search(request.course_id, request.document_ids, args)
             for question in questions:
@@ -258,7 +258,7 @@ class ToolRegistry:
             return ToolResult(questions=[question], sources=sources)
         return self._analyze(question, sources, context)
 
-    def _knowledge(self, query: str, context: ToolContext) -> list[Source]:
+    def _knowledge(self, query: str, context: ToolContext, *, locate=False) -> list[Source]:
         request = context.request
         with self.sessions() as session:
             statement = select(Document.id).where(
@@ -269,7 +269,8 @@ class ToolRegistry:
             ids = list(session.scalars(statement))
         if not ids:
             return []
-        result = self.retriever.search(
+        retrieve = self.retriever.locate if locate else self.retriever.search
+        result = retrieve(
             SearchRequest(course_id=request.course_id, document_ids=ids, question=query)
         )
         return context.cite(result.sources)

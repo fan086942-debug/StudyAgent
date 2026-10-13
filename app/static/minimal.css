@@ -162,7 +162,7 @@ footer { margin-top: 40px; font-size: 13px; }
 .auth-card p { font-size: 14px; color: var(--muted); }
 #auth-description { min-height: 24px; margin: 0 0 20px; }
 .auth-tabs { display: flex; background: var(--bg); padding: 4px; border: 1px solid var(--border); border-radius: 10px; margin-right: 34px; }
-.auth-tabs button { flex: 1; min-width: 0; padding: 6px 12px; border-radius: 7px; min-height: 36px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 500; transition: background 160ms,color 160ms,box-shadow 160ms; }
+.auth-tabs button { flex: 1; min-width: 0; padding: 6px 12px; border-radius: 7px; min-height: 44px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 500; transition: background 160ms,color 160ms,box-shadow 160ms; }
 .auth-tabs button[aria-selected="true"] { background: var(--surface); color: var(--green); box-shadow: 0 2px 5px #1831270d; font-weight: 600; }
 .auth-card input { min-height: 48px; border-radius: 10px; }
 .auth-card label { margin-top: 16px; }

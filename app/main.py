@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api.agent import router as agent_router
 from app.api.auth import router as auth_router
@@ -173,10 +175,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok",
             "mode": app.state.settings.study_mode,
             "version": "0.4.0",
+            "build": "20261013-fast-workspace",
+            "commit": os.environ.get("RENDER_GIT_COMMIT", "local"),
             "max_upload_mb": settings.max_upload_mb,
             "ocr_enabled": settings.ocr_enabled,
             "auth_enabled": settings.auth_enabled,
             "startup_ms": app.state.startup_ms,
         }
 
+    if os.environ.get("RENDER") == "true":
+        # Render terminates HTTPS at its ingress; normalize scheme before origin validation.
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
     return app

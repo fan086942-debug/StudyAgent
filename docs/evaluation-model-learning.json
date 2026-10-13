@@ -4,28 +4,28 @@
   "chapters": 3,
   "questions": 3,
   "study_usage": {
-    "prompt_tokens": 6181,
-    "completion_tokens": 1200,
-    "total_tokens": 7381,
-    "prompt_cache_hit_tokens": 512,
-    "prompt_cache_miss_tokens": 5669
+    "prompt_tokens": 6751,
+    "completion_tokens": 1370,
+    "total_tokens": 8121,
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 5727
   },
   "question_usage": {
-    "prompt_tokens": 9562,
-    "completion_tokens": 308,
-    "total_tokens": 9870,
-    "prompt_cache_hit_tokens": 3072,
-    "prompt_cache_miss_tokens": 6490
+    "prompt_tokens": 9824,
+    "completion_tokens": 389,
+    "total_tokens": 10213,
+    "prompt_cache_hit_tokens": 6272,
+    "prompt_cache_miss_tokens": 3552
   },
   "question_tools": [
     "search_knowledge",
-    "search_knowledge"
+    "locate_source"
   ],
-  "answer": "层次聚类（凝聚式）的基本概念：它从每个样本各自成为一个单点簇开始，反复合并当前距离最近的两个簇，逐步形成一棵层次结构（聚类树），因此不需要预先指定簇数 [S2]。\n\n簇间距离的计算方式（链接准则）有三种 [S2]：\n1. 单链接（single link）：取两个簇之间所有跨簇点对距离的最小值；\n2. 完全链接（complete link）：取跨簇点对距离的最大值；\n3. 平均链接（average link）：取所有跨簇点对距离的平均值。\n\n点与点之间的距离常用欧氏距离，即对应坐标差的平方和再开方 [S2]。\n\n补充说明：资料中只给出了上述链接准则与欧氏距离的定义，未展开更细的公式推导或复杂度分析；如需更深入内容，可进一步查阅该章原文 [S1]。",
+  "answer": "层次聚类（以凝聚层次聚类为例）的基本概念：它从每个数据点各自作为一个单点簇开始，反复合并距离最近的两个簇，逐步形成一棵层次结构（聚类树），从而得到不同粒度下的簇划分 [S2]。\n\n关于距离如何计算，资料给出两个层面：\n\n1. 点与点之间的距离：使用欧氏距离，即对应坐标差的平方和再开方 [S2]。\n\n2. 簇与簇之间的距离（链接准则）：\n- 单链接（single linkage）：取两个簇之间所有跨簇点对距离的最小值 [S2]；\n- 完全链接（complete linkage）：取跨簇点对距离的最大值 [S2]；\n- 平均链接（average linkage）：取所有跨簇点对距离的平均值 [S2]。\n\n因此，凝聚层次聚类的计算流程可概括为：先按欧氏距离算出点对距离，再按所选链接准则把点对距离汇总为簇间距离，每步合并簇间距离最小的两个簇，直到满足停止条件 [S2]。\n\n补充说明：资料中未给出具体的停止条件（如簇数阈值或距离阈值）以及层次聚类与 K 均值在复杂度上的对比，如需这部分内容可进一步查阅资料或另行提问。",
   "coverage": {
     "documents": [
       {
-        "id": "07bdc2f3c4f646f1983ba0f970ab3623",
+        "id": "90a8f41e0d394915954cccd5b09d7b9f",
         "name": "自编三章学习资料.docx"
       }
     ],

@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import secrets
+import sqlite3
 import time
 from collections import deque
 from threading import Lock
@@ -92,17 +93,35 @@ class AuthService:
                 raise AppError("auth_rate_limit", "尝试过于频繁，请五分钟后再试", 429)
             attempts.append(now)
 
+    def remote_setup_allowed(self):
+        if not self.settings.auth_allow_remote_setup:
+            return False
+        uploads = self.settings.data_dir / "uploads"
+        if uploads.exists() and any(uploads.iterdir()):
+            return False
+        database = (self.settings.data_dir / "studyagent.db").resolve()
+        if database.exists():
+            try:
+                with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
+                    names = {row[0] for row in db.execute("select name from sqlite_master where type='table'")}
+                    for name in ("courses", "documents", "conversations", "study_artifacts"):
+                        if name in names and db.execute(f'SELECT 1 FROM "{name}" LIMIT 1').fetchone():
+                            return False
+            except sqlite3.Error:
+                return False
+        return True
+
     def register(self, username, password, local):
         password_hash = hash_password(password)
         with self.sessions() as session:
             # Serialize first-account creation across processes as well as threads.
             session.connection().exec_driver_sql("BEGIN IMMEDIATE")
             first = session.scalar(select(User.id).limit(1)) is None
-            if first and not local:
+            if first and not local and not self.remote_setup_allowed():
                 raise AppError("setup_local_only", "请先在服务器本机创建首个账号", 403)
             if not first and not self.settings.auth_registration_enabled:
                 raise AppError("registration_closed", "注册已关闭，请联系管理员", 403)
-            user = User(username=username, password_hash=password_hash, legacy_workspace=first)
+            user = User(username=username, password_hash=password_hash, legacy_workspace=first and local)
             session.add(user)
             try:
                 session.commit()

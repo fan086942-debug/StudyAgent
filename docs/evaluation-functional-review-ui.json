@@ -1,0 +1,36 @@
+{
+  "six_digit_password": true,
+  "formats": [
+    "pdf",
+    "pptx",
+    "docx"
+  ],
+  "read_and_index": true,
+  "source_scope_and_position": true,
+  "generate_two_questions": true,
+  "questions_only_export": true,
+  "reload_restores_selected_scope_and_context": true,
+  "contextual_followup": true,
+  "exam_search": true,
+  "safe_answer_and_keyboard_source_tabs": true,
+  "widths": [
+    320,
+    375,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "javascript_errors": 0,
+  "long_password_input_characters": 4096,
+  "python_tests_passed": 202,
+  "real_model_generation_and_followup": true,
+  "real_model_restart_restore": true,
+  "formal_original_counts": {
+    "courses": 2,
+    "documents": 3,
+    "chunks": 713,
+    "conversations": 7,
+    "study_artifacts": 1
+  }
+}

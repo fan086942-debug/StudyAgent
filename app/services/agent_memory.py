@@ -1,4 +1,4 @@
-"""Bounded, temporary per-tab Agent context; durable conversation history is separate."""
+"""Bounded per-tab Agent context, persisted in the owning workspace with a two-hour TTL."""
 
 import json
 import time
@@ -7,10 +7,10 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from threading import RLock
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.errors import AppError
-from app.models import Document
+from app.models import AgentContext, Document
 
 
 @dataclass
@@ -50,28 +50,64 @@ class AgentMemory:
             )
         return scope, fingerprint
 
+    def _persist(self, identifier, entry):
+        with self.sessions() as session:
+            row = session.get(AgentContext, identifier)
+            if row is None:
+                row = AgentContext(id=identifier, course_id=entry.scope[0])
+                session.add(row)
+            row.payload = dict(scope=entry.scope, fingerprint=entry.fingerprint, turns=entry.turns)
+            row.updated_at = time.time()
+            session.execute(delete(AgentContext).where(AgentContext.updated_at < time.time() - self.ttl))
+            session.flush()
+            # Bound durable storage too; an active context is protected by its in-process lock.
+            rows = list(session.scalars(select(AgentContext).order_by(AgentContext.updated_at.desc())))
+            for old in rows[self.max_sessions:]:
+                cached = self.entries.get(old.id)
+                if old.id != identifier and not (cached and cached.busy):
+                    session.delete(old)
+            session.commit()
+
+    def _restore(self, identifier):
+        with self.sessions() as session:
+            row = session.get(AgentContext, identifier)
+            if row is None or row.updated_at < time.time() - self.ttl:
+                return None
+            payload = row.payload
+            course, documents = payload["scope"]
+            scope = (course, None if documents is None else tuple(documents))
+            fingerprint = tuple(tuple(item) for item in payload["fingerprint"])
+            return SessionMemory(scope, fingerprint, deepcopy(payload["turns"]))
+
     def _entry(self, identifier, scope, fingerprint):
         now = time.monotonic()
         for key, entry in list(self.entries.items()):
             if not entry.busy and now - entry.updated > self.ttl:
                 del self.entries[key]
+                with self.sessions() as session:
+                    session.execute(delete(AgentContext).where(AgentContext.id == key))
+                    session.commit()
         entry = self.entries.get(identifier)
+        if entry is None:
+            entry = self._restore(identifier)
         reset = entry is None
         if entry is not None and entry.scope != scope:
             raise AppError("session_scope_changed", "课程或资料范围已改变，请开启新对话。", 409)
         if entry is not None and entry.busy:
             raise AppError("session_busy", "当前对话仍在处理上一条消息，请稍后再发送。", 409)
-        if entry is None:
+        if identifier not in self.entries:
             if len(self.entries) >= self.max_sessions:
                 idle = [(key, value) for key, value in self.entries.items() if not value.busy]
                 if not idle:
                     raise AppError("session_capacity", "当前对话服务繁忙，请稍后重试。", 503)
                 del self.entries[min(idle, key=lambda item: item[1].updated)[0]]
+        if entry is None:
             entry = SessionMemory(scope, fingerprint)
-            self.entries[identifier] = entry
         if entry.fingerprint != fingerprint:
             entry.fingerprint, entry.turns, reset = fingerprint, [], True
+        self.entries[identifier] = entry
         entry.updated = now
+        self._persist(identifier, entry)
         return entry, reset
 
     @contextmanager
@@ -86,6 +122,7 @@ class AgentMemory:
         finally:
             with self.lock:
                 entry.busy, entry.updated = False, time.monotonic()
+                self._persist(request.session_id, entry)
 
     def remember(self, entry, request, result, generation):
         turn = dict(
@@ -150,6 +187,11 @@ class AgentMemory:
             matches = entry is not None and entry.scope[0] == course_id
             if matches and entry.busy:
                 raise AppError("session_busy", "该对话正在生成回答，请处理完成后再删除。", 409)
+            if not matches and session_id:
+                with self.sessions() as session:
+                    row = session.get(AgentContext, session_id)
+                    matches = row is not None and row.course_id == course_id
             yield matches
             if matches:
-                del self.entries[session_id]
+                # The learning service removes durable context in the deletion transaction.
+                self.entries.pop(session_id, None)

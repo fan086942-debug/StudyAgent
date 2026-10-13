@@ -112,6 +112,13 @@ async function loadCourses(preferred) {
   $("create-course").open = !courses.length;
   $("course-delete-open").hidden = !currentCourse;
   selected.clear();
+  if (!sessionScope) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("study-agent-session") || "null");
+      const [course, documents] = JSON.parse(saved?.scope || "[]");
+      if (course === currentCourse && Array.isArray(documents)) documents.forEach(id => selected.add(id));
+    } catch {}
+  }
   resetLearning();
   $("result").hidden = true;
   resetArtifacts();
@@ -261,7 +268,10 @@ $("question-form").addEventListener("submit", async (event) => {
   if (selected.size) body.document_ids = [...selected];
   $("ask-button").disabled = true; $("result").hidden = true; setAnalyzing(true); status("正在检索资料并整理回答…");
   try {
-    const result = await post(`/api/${$("task-mode").value}`, body, {signal: questionController.signal});
+    const valid = () => courseId === currentCourse && epoch === scopeEpoch && askId === askEpoch && identifier === activeSession;
+    const result = $("task-mode").value === "agent"
+      ? await streamAgent(body, questionController.signal, packet => { if (valid()) updateAgentProgress(packet); })
+      : await post("/api/chat", body, {signal: questionController.signal});
     if (courseId !== currentCourse || epoch !== scopeEpoch || askId !== askEpoch || identifier !== activeSession) return;
     renderResult(result);
     if (result.session_id) await loadSession();
@@ -281,7 +291,7 @@ function renderResult(result) {
       button.addEventListener("click", () => showView("learning")); $("agent-learning").append(button);
     }
     refreshProgress().catch(() => {});
-    $("answer").textContent = result.answer; $("warning").textContent = result.warning || "";
+    $("answer").replaceChildren(window.studyReader ? window.studyReader.renderAnswer(result) : document.createTextNode(result.answer)); $("warning").textContent = result.warning || "";
     $("timing").textContent = `${result.trace ? `工具 ${result.trace.length} 次 · ` : ""}总计 ${Math.round(result.total_ms || 0)} ms${result.usage?.total_tokens ? ` · 模型报告用量 ${result.usage.total_tokens} tokens` : ""}`;
     $("trace").replaceChildren();
     $("trace-panel").hidden = !result.trace?.length;
@@ -302,9 +312,10 @@ function renderResult(result) {
     renderQuestions(result.questions || [], $("matched-questions"));
     $("sources").replaceChildren();
     for (const source of result.sources) {
-      $("sources").append(sourceCard(source));
+      const card = sourceCard(source); card.dataset.citation = source.citation_id; $("sources").append(card);
     }
     if (!result.sources.length) $("sources").append(element("p", "没有可展示的可靠引用。可补充资料或换一种问法。", "empty"));
+    window.studyReader?.update(result);
     $("result").hidden = false; $("welcome").hidden = true; status("处理完成。");
 }
 
@@ -667,7 +678,7 @@ function showView(view, scroll = true) {
   if (changed && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     const panel = document.querySelector(`[data-panel="${view}"]`);
     panel.getAnimations().forEach(animation => animation.cancel());
-    panel.animate([{opacity: 0, transform: "translateY(8px)"}, {opacity: 1, transform: "translateY(0)"}], {duration: 220, easing: "cubic-bezier(.2,.7,.2,1)"});
+    panel.animate([{opacity: 0, transform: "translateY(14px)"}, {opacity: 1, transform: "translateY(0)"}], {duration: 320, easing: "cubic-bezier(.2,.75,.2,1)"});
   }
   closeSidebar();
   if (scroll) window.scrollTo({top: 0, behavior: motion()});
@@ -794,7 +805,7 @@ $("drop-zone").addEventListener("drop", event => {
   const transfer = new DataTransfer(); files.forEach(file => transfer.items.add(file));
   $("files").files = transfer.files; updateFiles();
 });
-function updateScope() { $("scope-note").textContent = !currentCourse ? "尚未选择课程 · 资料为空" : selected.size ? `已勾选 ${selected.size} 份 · 限定检索与生成范围` : "未勾选 · 使用当前课程全部资料"; synchronizeSession(); }
+function updateScope() { $("scope-note").textContent = !currentCourse ? "尚未选择课程 · 资料为空" : selected.size ? `已勾选 ${selected.size} 份 · 限定检索与生成范围` : "未勾选 · 使用当前课程全部资料"; synchronizeSession(); document.dispatchEvent(new Event("study-scope-change")); }
 function setAnalyzing(active) {
   $("agent-availability").textContent = active ? "正在思考" : document.body.dataset.auth === "guest" ? "登录后启用" : "准备就绪";
   clearInterval(requestTimer);
@@ -802,6 +813,7 @@ function setAnalyzing(active) {
   $("question-form").setAttribute("aria-busy", String(active));
   $("ask-button").textContent = active ? "正在分析…" : document.body.dataset.auth === "guest" ? "登录后提问" : "发送问题";
   if (active) {
+    $("progress-message").textContent = "正在连接学习助手…"; $("progress-tools").replaceChildren();
     const begun = performance.now(); $("elapsed-label").textContent = "0 秒";
     requestTimer = setInterval(() => { $("elapsed-label").textContent = `${Math.floor((performance.now() - begun) / 1000)} 秒`; }, 1000);
   }
@@ -817,7 +829,8 @@ function resetLearning() {
   for (const id of ["wrongbook", "plans", "conversation-history", "activity-chart", "weak-topics", "agent-learning"]) $(id).replaceChildren();
   $("wrongbook").append(element("p", "选择课程后，查看你的错题与练习记录。", "empty"));
   $("plans").append(element("p", "选择课程并创建复习计划，按自己的节奏前进。", "empty"));
-  $("conversation-history").append(element("p", "选择课程后，查看已保存的对话记录。", "empty"));
+  $("conversation-history").append(historyEmptyState());
+  $("history-search").value = ""; applyHistoryFilter();
   $("weak-topics").append(element("p", "记录练习反馈后，薄弱点会出现在这里。", "empty"));
   $("weakness-review").disabled = true;
   for (const id of ["more-wrongs", "more-plans", "more-history"]) $(id).hidden = true;
@@ -1063,10 +1076,13 @@ async function loadHistory(append = false) {
   if (course !== currentCourse || epoch !== scopeEpoch || requestEpoch !== historyEpoch) return;
   if (!append) $("conversation-history").replaceChildren();
   for (const record of records) {
-    const row = element("article", undefined, "paper-row");
-    const text = element("div", record.question);
-    text.append(element("p", `${record.kind === "agent" ? "学习 Agent" : "资料问答"} · ${new Date(record.created_at).toLocaleString("zh-CN", {timeZone: "Asia/Shanghai"})}`, "hint"));
-    const button = element("button", "重新查看 ↗", "secondary"); button.type = "button";
+    const row = element("article", undefined, "paper-row history-record");
+    row.dataset.search = `${record.question} ${record.kind === "agent" ? "智能助手" : "资料问答"}`.toLocaleLowerCase();
+    const marker = element("span", String($("conversation-history").querySelectorAll(".history-record").length + 1).padStart(2,"0"), "history-record-index"); marker.setAttribute("aria-hidden", "true");
+    const text = element("div", undefined, "history-record-body");
+    text.append(element("h3", record.question));
+    text.append(element("p", `${record.kind === "agent" ? "智能助手" : "资料问答"} · ${new Date(record.created_at).toLocaleString("zh-CN", {timeZone: "Asia/Shanghai"})}`, "hint"));
+    const button = element("button", "查看回答 ↗", "secondary"); button.type = "button";
     button.addEventListener("click", async () => {
       button.disabled = true;
       try {
@@ -1076,11 +1092,35 @@ async function loadHistory(append = false) {
         $("result").scrollIntoView({behavior: motion(), block: "start"}); status("已打开历史回答与来源快照。");
       } catch (error) { status(error.message, true); }
       finally { button.disabled = false; }
-    }); row.append(text, button, conversationDeleteButton(course, record.id)); $("conversation-history").append(row);
+    }); row.append(marker, text, button, conversationDeleteButton(course, record.id)); $("conversation-history").append(row);
   }
   historyOffset = offset + records.length; $("more-history").hidden = records.length < 20;
-  if (!historyOffset) $("conversation-history").append(element("p", "好问题值得留下。完成一次资料问答，记录将自动保存在这里。", "empty"));
+  if (!historyOffset) $("conversation-history").append(historyEmptyState());
+  applyHistoryFilter();
 }
+function historyEmptyState() {
+  const card = $("history-empty-template").content.firstElementChild.cloneNode(true);
+  const guest = window.studyAuth?.enabled && !window.studyAuth.user;
+  const button = card.querySelector("button");
+  if (guest) {
+    card.querySelector("h3").textContent = "给好问题，一个留下来的地方。";
+    button.replaceChildren(document.createTextNode("登录，查看我的对话"));
+  }
+  button.addEventListener("click", () => {
+    if (window.studyAuth && !window.studyAuth.require("登录后，找回你的回答与思考。")) return;
+    promptQuestion("");
+  });
+  return card;
+}
+function applyHistoryFilter() {
+  const query = $("history-search").value.trim().toLocaleLowerCase();
+  const rows = [...$("conversation-history").querySelectorAll(".history-record")];
+  let visible = 0;
+  for (const row of rows) { row.hidden = !!query && !row.dataset.search.includes(query); if (!row.hidden) visible += 1; }
+  $("history-count").textContent = query ? `${visible} / ${rows.length} 条` : `${rows.length} 条`;
+  $("history-filter-empty").hidden = !rows.length || visible > 0;
+}
+$("history-search").addEventListener("input", applyHistoryFilter);
 $("refresh-history").addEventListener("click", () => loadHistory().catch(error => status(error.message, true)));
 $("more-history").addEventListener("click", () => loadHistory(true).catch(error => status(error.message, true)));
 $("copy-answer").addEventListener("click", async () => {
@@ -1088,3 +1128,68 @@ $("copy-answer").addEventListener("click", async () => {
   catch { status("浏览器未允许剪贴板访问，可选中回答手动复制。", true); }
 });
 window.addEventListener("hashchange", () => showView(location.hash.slice(1) || "study", false));
+
+
+// SSE carries execution status; only the validated final result enters renderResult.
+async function streamAgent(body, signal, onProgress) {
+  if (window.studyAuth && !window.studyAuth.require()) throw new Error("请登录后继续。");
+  const authEpoch = window.studyAuth?.epoch;
+  let response;
+  try {
+    response = await fetch("/api/agent/stream", {method: "POST", signal,
+      headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  } catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new Error("无法连接学习服务，请确认服务正在运行。");
+  }
+  if (signal.aborted || authEpoch !== window.studyAuth?.epoch) throw new DOMException("请求已取消。", "AbortError");
+  if (!response.ok) {
+    if (response.status === 401) window.showAuthGate?.();
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "学习助手请求失败，请重试。");
+  }
+  const reader = response.body.getReader(), decoder = new TextDecoder();
+  let buffer = "", result;
+  const consume = () => {
+    let boundary;
+    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, boundary); buffer = buffer.slice(boundary + 2);
+      const data = block.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trimStart()).join("\n");
+      if (!data) continue;
+      const packet = JSON.parse(data);
+      if (packet.type === "error") throw new Error(packet.message || "学习助手处理失败，请重试。");
+      if (packet.type === "result") result = packet.data;
+      else onProgress(packet);
+    }
+  };
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (signal.aborted || authEpoch !== window.studyAuth?.epoch) throw new DOMException("请求已取消。", "AbortError");
+      buffer += done ? decoder.decode() : decoder.decode(value, {stream: true});
+      consume();
+      if (done) break;
+    }
+    if (!result) throw new Error("连接已结束，未收到完整回答，请重试。");
+    return result;
+  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+}
+function updateAgentProgress(packet) {
+  if (packet.type === "status") { $("progress-message").textContent = packet.message; return; }
+  if (packet.type !== "tool") return;
+  const label = packet.purpose || "处理资料";
+  let row = $("progress-tools").querySelector(`[data-step="${Number(packet.step)}"]`);
+  if (!row) {
+    row = element("li"); row.dataset.step = String(Number(packet.step));
+    $("progress-tools").append(row);
+  }
+  row.dataset.state = packet.status;
+  const state = packet.status === "running" ? "执行中" : packet.status === "error" ? "未完成" : "已完成";
+  row.textContent = `${packet.step}. ${label} · ${state}`;
+  $("progress-message").textContent = packet.status === "running" ? `正在${label}…` : `${label} · ${state}`;
+}
+$("stop-analysis").addEventListener("click", () => {
+  questionController?.abort(); askEpoch += 1;
+  $("ask-button").disabled = false; setAnalyzing(false);
+  status("已停止等待。当前执行中的调用可能完成，助手不会继续后续步骤。");
+});

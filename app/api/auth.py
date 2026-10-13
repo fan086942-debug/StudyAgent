@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 class Credentials(BaseModel):
     username: str = Field(min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_-]+$")
-    password: str = Field(min_length=10, max_length=128)
+    password: str = Field(min_length=6)
 
     @field_validator("username")
     @classmethod
@@ -45,6 +45,7 @@ def me(request: Request, response: Response):
     return {
         "enabled": True, "user": public_user(user) if user else None,
         "setup_required": setup,
+        "setup_local_only": setup and not service.remote_setup_allowed(),
         "registration_enabled": setup or service.settings.auth_registration_enabled,
     }
 

@@ -18,11 +18,19 @@ class StudyAgent:
         self.settings, self.registry, self.planner = settings, registry, planner
         self.memory = memory
 
-    def run(self, request: SearchRequest) -> AgentResponse:
+    def run(self, request: SearchRequest, *, progress=None, cancelled=None) -> AgentResponse:
+        def checkpoint(event=None):
+            if cancelled and cancelled():
+                raise AppError("agent_cancelled", "已停止后续处理。", 409)
+            if event is not None and progress:
+                progress(event)
+
+        checkpoint()
         self.registry.exams.validate_scope(request.course_id, request.document_ids)
         if self.memory and getattr(request, "session_id", None):
             with self.memory.turn(request) as (entry, history, reset):
-                result = self._run(request, history)
+                result = self._run(request, history, checkpoint)
+                checkpoint()
                 result.conversation_id = uuid4().hex
                 self.memory.remember(entry, request, result, self.registry.generation)
                 result.session_id, result.context_turns, result.context_reset = (
@@ -31,9 +39,11 @@ class StudyAgent:
                     reset,
                 )
                 return result
-        return self._run(request, [])
+        result = self._run(request, [], checkpoint)
+        checkpoint()
+        return result
 
-    def _run(self, request, history):
+    def _run(self, request, history, checkpoint):
         start, run_id = time.perf_counter(), uuid4().hex
         context = ToolContext(request)
         context.prior_questions = [q for turn in history for q in turn["generated_questions"]]
@@ -49,6 +59,7 @@ class StudyAgent:
                     intent["topics"] = history[-1]["topics"]
         if intent is not None:
             begun = time.perf_counter()
+            checkpoint({"type": "tool", "step": 1, "tool": tool, "purpose": TOOL_SPECS[tool][1], "status": "running"})
             try:
                 if tool in {"generate_mock_exam", "generate_review"}:
                     if not intent["topics"]:
@@ -83,10 +94,15 @@ class StudyAgent:
                         elapsed_ms=(time.perf_counter() - begun) * 1000,
                     )
                 ]
+                checkpoint({"type": "tool", **trace[0].model_dump(exclude={"arguments", "observation"})})
+                checkpoint({"type": "status", "stage": "validating", "message": "正在校验回答与资料来源…"})
                 return self._finish(
                     context, trace, result.usage, None, "completed", result.warning, start
                 )
             except AppError as exc:
+                if exc.code == "agent_cancelled":
+                    raise
+                checkpoint({"type": "tool", "step": 1, "tool": tool, "purpose": TOOL_SPECS[tool][1], "status": "error"})
                 return AgentResponse(
                     answer=exc.message,
                     sources=[],
@@ -128,6 +144,7 @@ class StudyAgent:
         # 一轮由“模型选择 → 校验参数 → 执行工具 → 回传观察”组成。
         # 除模型轮数外，也限制总工具调用数，多工具响应不能绕过执行上限。
         for _ in range(self.settings.agent_max_steps + 1):
+            checkpoint({"type": "status", "stage": "planning", "message": "正在分析问题，选择下一步工具…"})
             if len(json.dumps(messages, ensure_ascii=False)) > self.settings.agent_context_chars:
                 reason, warning = "context_limit", "执行上下文达到上限，请缩小资料范围或拆分问题。"
                 break
@@ -137,6 +154,7 @@ class StudyAgent:
                 self._usage(usage, exc.usage)
                 reason, warning = "provider_error", exc.message
                 break
+            checkpoint()
             self._usage(usage, turn.usage)
             if not turn.calls:
                 final, reason = turn.final, "completed"
@@ -158,6 +176,7 @@ class StudyAgent:
             for call in turn.calls:
                 begun = time.perf_counter()
                 name, raw = call.function.name, call.function.arguments
+                checkpoint({"type": "tool", "step": len(trace) + 1, "tool": name, "purpose": TOOL_SPECS[name][1] if name in TOOL_SPECS else "未注册工具", "status": "running"})
                 try:
                     args = json.loads(raw)
                     if not isinstance(args, dict):
@@ -220,6 +239,7 @@ class StudyAgent:
                         elapsed_ms=(time.perf_counter() - begun) * 1000,
                     )
                 )
+                checkpoint({"type": "tool", **trace[-1].model_dump(exclude={"arguments", "observation"})})
                 # tool_call_id 把观察绑定到具体调用，模型下一轮可据此继续规划。
                 messages.append(
                     {
@@ -236,6 +256,7 @@ class StudyAgent:
                     state,
                     observation,
                 )
+        checkpoint({"type": "status", "stage": "validating", "message": "正在校验回答与资料来源…"})
         return self._finish(context, trace, usage, final, reason, warning, start)
 
     @staticmethod

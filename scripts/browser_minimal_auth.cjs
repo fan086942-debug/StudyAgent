@@ -148,9 +148,9 @@ const assert = require('node:assert/strict');
     const other = await page.locator('#course').inputValue();
     await page.locator('#course').selectOption(course);
     await page.locator('#stat-attempts').filter({hasText:'3'}).waitFor();
-    await page.route('**/api/agent', async route => {
+    await page.route('**/api/agent/stream', async route => {
       await new Promise(resolve => setTimeout(resolve, 1200));
-      await route.fulfill({json: {answer:'SHOULD_NOT_RENDER',sources:[],questions:[],trace:[],total_ms:1}});
+      await route.fulfill({contentType:'text/event-stream',body:'data: '+JSON.stringify({type:'result',data:{answer:'SHOULD_NOT_RENDER',sources:[],questions:[],trace:[],total_ms:1}})+'\n\n'});
     });
     await page.locator('#question').fill('测试迟到响应');
     await page.locator('#ask-button').click();
@@ -160,7 +160,7 @@ const assert = require('node:assert/strict');
     await page.waitForTimeout(1600);
     assert.ok(!(await page.locator('#answer').innerText()).includes('SHOULD_NOT_RENDER'));
     assert.ok(await page.locator('#result').isHidden());
-    await page.unroute('**/api/agent');
+    await page.unroute('**/api/agent/stream');
     results.course_race_guard = true;
     await page.locator('#question').fill('');
     await page.evaluate(() => { document.getElementById('status').textContent = ''; document.getElementById('toast').hidden = true; });
@@ -208,7 +208,17 @@ const assert = require('node:assert/strict');
     await page.locator('#auth-screen').waitFor({state:'hidden'});
     await page.waitForFunction(()=>document.getElementById('course').options.length>1);
     results.login_and_account_persistence = true;
+    await page.route('**/api/courses',async route=>{
+      await new Promise(resolve=>setTimeout(resolve,500));
+      await route.fulfill({json:[{id:'old-account-course',name:'PRIVATE_OLD_ACCOUNT'}]});
+    });
+    await page.evaluate(()=>{window.oldAccountLoad=loadCourses().catch(error=>error.name);});
     await page.request.post(new URL('/api/auth/logout',page.url()).href);
+    await page.evaluate(()=>showAuthGate());
+    assert.equal(await page.evaluate(()=>window.oldAccountLoad),'AbortError');
+    assert.ok(!(await page.locator('#course').textContent()).includes('PRIVATE_OLD_ACCOUNT'));
+    await page.unroute('**/api/courses');
+    results.account_race_guard=true;
     await page.evaluate(()=>loadCourses().catch(()=>{}));
     await page.locator('#auth-screen').waitFor();
     assert.ok(await page.locator('body').evaluate(el=>el.dataset.auth==='guest'));

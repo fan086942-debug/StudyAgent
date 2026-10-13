@@ -20,14 +20,16 @@
     document.querySelectorAll(".account-only").forEach(node => { node.hidden = !canUse(); });
   }
 
-  function clearWorkspace(keepDraft = true) {
+  function clearWorkspace(keepDraft = true, preserveLogin = false) {
     const draft = keepDraft ? $("question").value : "";
     clearTimeout(documentRefreshTimer);
     questionController?.abort();
     currentCourse = ""; selected.clear(); libraryDocuments = [];
     resetLearning(); resetArtifacts();
-    $("result").hidden = true;
-    for (const id of ["answer", "sources", "trace", "warning", "generated-artifacts", "matched-questions", "artifact-content", "artifact-sources", "artifact-downloads", "session-turns", "papers", "question-list"]) $(id).replaceChildren();
+    pendingCourseDelete = pendingDocumentDelete = null; relationEpoch += 1;
+    for (const id of ["generation-topics", "plan-topics", "question-keyword"]) $(id).value = "";
+    $("result").hidden = true; window.studyReader?.update({sources: []});
+    for (const id of ["answer", "sources", "trace", "warning", "generated-artifacts", "matched-questions", "artifact-content", "artifact-sources", "artifact-downloads", "artifact-title", "artifact-warning", "relation-content", "relation-description", "delete-course-name", "delete-document-name", "session-turns", "papers", "question-list"]) $(id).replaceChildren();
     $("session-history").hidden = true;
     $("question").value = draft; updateQuestionCount();
     $("course").replaceChildren(element("option", "登录后查看课程"));
@@ -37,13 +39,15 @@
     $("course-delete-open").hidden = true;
     $("connection-key").value = "";
     $("connection-model").value = ""; $("connection-url").value = "";
-    document.querySelectorAll("dialog[open]").forEach(node => node.close());
+    document.querySelectorAll("dialog[open]").forEach(node => { if (!preserveLogin || node !== dialog) node.close(); });
     $("mode").textContent = "模型设置";
     $("mode").classList.remove("live");
     $("mode-note").textContent = "";
     for (const id of ["wrongbook", "plans", "conversation-history", "artifact-history", "question-list"]) {
       $(id).replaceChildren(element("p", "登录后，在这里继续你的学习。", "empty"));
     }
+    $("conversation-history").replaceChildren(historyEmptyState());
+    $("history-search").value = ""; applyHistoryFilter();
     for (const id of ["stat-documents", "stat-attempts", "stat-wrong", "stat-plan"]) $(id).textContent = "—";
     try { sessionStorage.removeItem("study-agent-session"); } catch {}
   }
@@ -113,9 +117,12 @@
       state.ready = true;
       available = result.registration_enabled !== false;
       setup = !!result.setup_required;
+      $("auth-setup-note").textContent = result.setup_local_only
+        ? "首个账号需从服务器本机创建，以安全承接已有学习资料。"
+        : "创建你的专属学习账号，课程、资料和模型设置相互独立。";
       if (!state.enabled || result.user) await enter(result.user);
       else {
-        clearWorkspace(true); synchronizeUI(); mode(setup);
+        clearWorkspace(true, true); synchronizeUI(); mode(setup);
         showView(location.hash.slice(1) || "study", false);
       }
     } catch (error) {
@@ -142,6 +149,13 @@
   }, true);
   document.querySelectorAll("[data-login]").forEach(button => button.addEventListener("click", () => open()));
   $("auth-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("keydown", event => {
+    if (event.key !== "Tab") return;
+    const controls = [...dialog.querySelectorAll('button:not(:disabled):not([tabindex="-1"]),input:not(:disabled)')].filter(node => node.getClientRects().length);
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
   dialog.addEventListener("click", event => {
     const rect = dialog.getBoundingClientRect();
     if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();

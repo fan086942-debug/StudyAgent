@@ -1,0 +1,59 @@
+{
+  "guest_browsing_and_agent_gate": true,
+  "dialog_keyboard_and_draft": true,
+  "registration": true,
+  "drag_upload": true,
+  "agent_chain": true,
+  "wrongbook_and_self_assessment": true,
+  "plan_checklist": true,
+  "generated_practice_and_download": true,
+  "persistence_and_history": true,
+  "theme_persistence": true,
+  "course_race_guard": true,
+  "responsive_widths": [
+    320,
+    375,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "reduced_motion": true,
+  "logout": true,
+  "login_and_account_persistence": true,
+  "account_race_guard": true,
+  "expired_session_gate": true,
+  "javascript_errors": 0,
+  "python_suite_passed": 187,
+  "static_checks": {
+    "ruff": "passed",
+    "javascript_syntax": "passed"
+  },
+  "verification_workspace": "G:/StudyAgent",
+  "migration": {
+    "documents_relocated": 3,
+    "database_backup": true,
+    "data_counts_preserved": {
+      "courses": 2,
+      "documents": 3,
+      "chunks": 713,
+      "conversations": 7,
+      "study_artifacts": 1
+    }
+  },
+  "deployed_url": "http://127.0.0.1:8000",
+  "deployed_guest_smoke": {
+    "workspace": true,
+    "login_dialog_and_draft": true,
+    "agent_requires_login": true,
+    "anonymous_business_requests": 0,
+    "javascript_errors": 0,
+    "widths": [
+      320,
+      375,
+      768,
+      1024,
+      1440
+    ]
+  }
+}

@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 
 from app.core.errors import AppError
 from app.models import (
+    AgentContext,
     Conversation,
     Course,
     Document,
@@ -49,6 +50,7 @@ def delete_course(state, course_id: str):
                 state.ingestion._delete_locked(document_id)
             with state.sessions() as session:
                 for model in [
+                    AgentContext,
                     Conversation,
                     StudyPlan,
                     WrongQuestion,

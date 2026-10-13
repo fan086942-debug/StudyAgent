@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import JSON, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -166,3 +166,11 @@ class Conversation(Base):
     document_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     payload: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[str] = mapped_column(default=utc_now)
+
+
+class AgentContext(Base):
+    __tablename__ = "agent_contexts"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    course_id: Mapped[str] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    updated_at: Mapped[float] = mapped_column(Float, index=True)

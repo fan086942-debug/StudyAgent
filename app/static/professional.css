@@ -1,0 +1,64 @@
+/* Reference-inspired reading workspace; shares Learning Studio's theme tokens. */
+body{background:radial-gradient(ellipse at 95% 0,var(--scene-wash),transparent 34%),var(--bg)}
+.workspace{max-width:1160px;padding:28px 44px 32px}
+.workspace-topline{margin-bottom:20px;font-size:12px}
+.studio-hero,body[data-auth="signed-in"] .studio-hero{grid-template-columns:minmax(0,1fr) 250px;min-height:166px;margin-bottom:24px;gap:24px}
+.hero h1,body[data-auth="signed-in"] .hero h1{font-size:34px;letter-spacing:-1px;line-height:1.3;max-inline-size:none}
+.hero h1 em{display:inline;margin-left:.15em}
+.workspace-kicker{letter-spacing:1.6px;margin-bottom:12px}
+.hero .intro,body[data-auth="signed-in"] .hero .intro{font-size:13px;line-height:1.8;margin:12px 0 0}
+.hero-link{display:none}
+.knowledge-scene,body[data-auth="signed-in"] .knowledge-scene{height:166px;border-radius:20px}
+.scene-source{top:11px;left:9px}.scene-practice{bottom:12px;right:8px}
+.scene-document{padding:9px 11px;gap:8px;font-size:11px;border-radius:10px}
+.scene-document small{font-size:7px;letter-spacing:.6px}
+.scene-core{width:51px;height:51px;left:calc(50% - 25px);top:calc(51% - 25px);border-radius:17px}
+.scene-core .icon{width:25px;height:25px}.scene-core::before{border-radius:22px}
+.orbit-a{width:171px;height:80px;margin:-40px 0 0 -85px}.orbit-b{width:118px;height:123px;margin:-61px 0 0 -59px}
+.scene-caption{bottom:3px;left:12px;right:4px;font-size:9px}.scene-particle{width:5px;height:5px}
+.particle-a{left:22px;bottom:31px}.particle-b{right:30px;top:21px}
+#view-study>.section-heading{display:none}
+.workspace-context{display:flex;align-items:center;gap:16px;background:color-mix(in srgb,var(--surface) 75%,transparent);border:1px solid var(--border);border-radius:14px;padding:13px 17px;margin-bottom:18px}
+#workspace-library{width:44px;height:44px;min-width:44px;padding:10px;background:var(--soft);color:var(--green);border:1px solid var(--border);border-radius:11px;box-shadow:none}
+.workspace-context-copy{min-width:0;flex:1}.workspace-context-copy strong{display:block;font-size:14px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}
+.workspace-context-copy p{font-size:12px;color:var(--muted);margin:4px 0 0;line-height:1.6}
+.memory-label{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:11px;white-space:nowrap}.memory-label .icon{width:15px;height:15px;color:var(--green)}
+#mode-note{font-size:12px;margin:0 0 14px;background:transparent;border-left:2px solid var(--border);padding:2px 12px;color:var(--muted);border-radius:0}
+.session-bar{margin:0 0 10px}
+.question-card{padding:22px 24px 18px;border-radius:18px;box-shadow:0 6px 28px #20274108}
+.composer-status{font-size:11px}.composer-top{gap:12px}.composer-label{font-weight:600}
+#question,body[data-auth="signed-in"] #question{min-height:100px;font-size:16px;line-height:1.85;padding-top:18px}
+#question-form:focus-within{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 9%,transparent),0 8px 30px #2027410c}
+.question-actions{padding-top:12px}.question-actions button{min-width:112px;border-radius:10px}
+.prompt-chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 24px}
+.prompt-chips button{display:flex;align-items:center;justify-content:flex-start;gap:9px;padding:12px 14px;min-height:48px;background:var(--surface);font-size:12px;text-align:left}
+.prompt-chips .icon{width:17px;height:17px;color:var(--green);flex-shrink:0}
+.stats-grid{gap:0;background:transparent;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;padding:7px 0;margin:0 0 22px}
+.stat-card{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;border:0!important;border-right:1px solid var(--border)!important;border-radius:0;box-shadow:none;padding:12px 18px;background:transparent}
+.stat-card:first-child{padding-left:0}.stat-card:last-child{border-right:0!important}
+.stat-card>span{font-size:12px}.stat-card strong{font-size:20px;margin:0 0 0 auto;letter-spacing:-.4px}
+.stat-card:hover{transform:none;box-shadow:none;background:color-mix(in srgb,var(--surface) 50%,transparent)}
+.page-heading{padding:22px 26px;margin-bottom:22px}.page-heading h1{font-size:28px}.history-heading h1 br{display:none}
+.history-heading h1 em{margin-left:5px}.history-heading{padding-right:116px}.heading-art{width:62px;height:62px;border-radius:18px;right:30px;top:calc(50% - 31px)}
+.heading-art .icon{width:28px;height:28px}.history-record{padding:18px 20px}
+#result{margin-top:28px;border:1px solid var(--border);background:var(--surface);border-radius:18px;padding:24px;box-shadow:var(--shadow)}
+.result-heading{gap:12px;flex-wrap:wrap;margin:0 0 16px}.result-heading h2{font-size:18px;font-weight:600;flex:1}.result-heading .hint{font-size:11px}
+.result-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);margin:0 0 22px}
+.result-tabs button{position:relative;background:transparent;color:var(--muted);border:0;min-height:44px;padding:10px 0;border-radius:0;box-shadow:none;font-size:13px;gap:7px}
+.result-tabs button:hover{transform:none;color:var(--ink)}
+.result-tabs button[aria-selected="true"]{color:var(--green);font-weight:600}
+.result-tabs button[aria-selected="true"]::after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:2px;border-radius:2px;background:var(--green)}
+.result-tabs .count-pill{font-size:11px;min-width:21px;text-align:center;padding:2px 6px}
+.answer{padding:0;border:0;box-shadow:none;background:transparent;border-radius:0;white-space:normal;font-size:15px;line-height:1.95;overflow-wrap:anywhere}
+.answer p{margin:0 0 16px}.answer p:last-child{margin-bottom:0}.answer h2{font-size:21px;margin:26px 0 12px}.answer h3{font-size:18px;margin:22px 0 10px}.answer h4{font-size:16px;margin:20px 0 10px}
+.answer ul,.answer ol{padding-left:24px;margin:12px 0 20px}.answer li{padding-left:3px;margin:6px 0}.answer blockquote{margin:16px 0;padding:10px 16px;border-left:3px solid var(--accent);background:var(--bg);color:var(--muted)}
+.answer code{font-family:Consolas,monospace;font-size:.9em;background:var(--soft);padding:2px 5px;border-radius:4px;white-space:pre-wrap}.answer pre{padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:auto}.answer pre code{background:transparent;padding:0}
+.answer .inline-citation{display:inline-flex;vertical-align:baseline;min-height:28px;min-width:30px;padding:1px 5px;margin:0 3px;color:var(--green);background:var(--soft);font-size:12px;border-radius:5px;box-shadow:none;border:1px solid transparent}
+.answer .inline-citation:hover{border-color:var(--accent);transform:none}
+#source-panel>h3{font-size:15px;margin:0 0 16px}.source p{font-size:14px;line-height:1.9}
+.warning:empty{display:none}#trace-panel{margin:18px 0}#generated-artifacts:not(:empty){margin:20px 0 0}
+@media(max-width:1150px){.workspace{padding:24px 28px}.memory-label{font-size:10px}.stat-card{padding:12px}.stat-card strong{font-size:18px}}
+@media(max-width:980px){.studio-hero,body[data-auth="signed-in"] .studio-hero{grid-template-columns:1fr;min-height:0}.knowledge-scene{display:none}.hero h1,body[data-auth="signed-in"] .hero h1{font-size:30px}.memory-label{display:none}.stat-card{gap:5px}.stat-card>span{font-size:11px}}
+@media(max-width:700px){.workspace{padding:22px 18px}.hero h1,body[data-auth="signed-in"] .hero h1{font-size:28px;max-inline-size:none}.hero h1 em{display:block;margin-left:0}.studio-hero{margin-bottom:20px}.workspace-context{gap:11px;padding:12px;margin-bottom:14px}.workspace-context-copy strong{font-size:13px}.workspace-context-copy p{font-size:11px}.question-card{padding:18px}#question{font-size:16px;min-height:105px}.prompt-chips{gap:7px;margin-bottom:20px}.prompt-chips button{padding:10px 9px;gap:6px;font-size:11px;line-height:1.6}.prompt-chips .icon{display:none}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:4px 0}.stat-card{padding:12px 8px!important}.stat-card:nth-child(2){border-right:0!important}.stat-card:nth-child(-n+2){border-bottom:1px solid var(--border)!important}.page-heading h1{font-size:24px}.history-heading h1 br{display:block}.history-heading h1 em{margin-left:0}.page-heading{padding:22px 20px}#result{padding:18px}.result-heading h2{font-size:17px}.result-heading .hint{order:3;width:100%}.answer{font-size:15px}.result-tabs{margin-bottom:18px}}
+@media(max-width:360px){.workspace{padding:20px 15px}.hero h1,body[data-auth="signed-in"] .hero h1{font-size:26px}.prompt-chips button{font-size:10px;padding:9px 7px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}

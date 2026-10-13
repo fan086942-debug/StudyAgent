@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -12,7 +13,8 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     auth_enabled: bool = True
     auth_registration_enabled: bool = True
-    auth_cookie_secure: bool = False
+    auth_cookie_secure: bool = Field(default_factory=lambda: os.environ.get("RENDER") == "true")
+    auth_allow_remote_setup: bool = Field(default_factory=lambda: os.environ.get("RENDER") == "true")
     auth_session_hours: int = Field(default=168, ge=1, le=720)
     llm_base_url: str = "https://api.openai.com/v1"
     llm_api_key: SecretStr = SecretStr("")

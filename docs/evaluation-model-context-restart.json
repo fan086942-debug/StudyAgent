@@ -1,0 +1,16 @@
+{
+  "model": "deepseek-flash",
+  "restored_turns": 4,
+  "continued_turns": 5,
+  "retained_topic": true,
+  "question_count": 1,
+  "source_scope_preserved": true,
+  "usage": {
+    "prompt_tokens": 1646,
+    "completion_tokens": 160,
+    "total_tokens": 1806,
+    "prompt_cache_hit_tokens": 640,
+    "prompt_cache_miss_tokens": 1006
+  },
+  "success": true
+}

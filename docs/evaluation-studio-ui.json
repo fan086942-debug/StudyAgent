@@ -1,0 +1,16 @@
+{
+  "real_stream_tool_feedback": true,
+  "history_search": true,
+  "collapsible_navigation": true,
+  "stop_and_draft": true,
+  "responsive_widths": [
+    320,
+    375,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "motion_pause_resume_offscreen_reduce": true,
+  "javascript_errors": 0
+}

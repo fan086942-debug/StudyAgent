@@ -2,10 +2,18 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.errors import AppError
-from app.models import Conversation, Document, PracticeAttempt, StudyPlan, WrongQuestion, new_id
+from app.models import (
+    AgentContext,
+    Conversation,
+    Document,
+    PracticeAttempt,
+    StudyPlan,
+    WrongQuestion,
+    new_id,
+)
 from app.schemas.chat import SearchRequest
 from app.schemas.learning import PlanArgs, PracticeRequest
 
@@ -366,5 +374,10 @@ class LearningService:
             row = session.get(Conversation, conversation_id)
             if row is None or row.course_id != course_id:
                 raise AppError("conversation_not_found", "当前课程中没有这条对话", 404)
+            identifier = row.payload.get("session_id")
+            if identifier:
+                session.execute(delete(AgentContext).where(
+                    AgentContext.id == identifier, AgentContext.course_id == course_id
+                ))
             session.delete(row)
             session.commit()

@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "study-agent"
 version = "0.4.0"
 description = "多源课程资料 RAG、试卷解析与工具调用复习 Agent"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "python-multipart>=0.0.20,<1",
   "pydantic>=2.10,<3", "pydantic-settings>=2.7,<3", "sqlalchemy>=2.0,<3",
   "chromadb>=1.0,<2", "pypdf>=5,<7", "python-pptx>=1.0,<2",
-  "python-docx>=1.1,<2", "httpx>=0.28,<1",
+  "python-docx>=1.1,<2", "httpx>=0.28,<1", "certifi>=2024.2.2",
   "rapidocr-onnxruntime>=1.4,<2", "pypdfium2>=4.30,<6"
 ]
 
