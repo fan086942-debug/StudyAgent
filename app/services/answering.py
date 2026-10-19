@@ -20,11 +20,28 @@ def valid_answer(answer, sources: list[Source], *, allow_model=False) -> bool:
     return bool(claimed and claimed == inline and claimed.issubset(available))
 
 
-def solve(llm, question, sources):
+def solve(llm, question, sources, *, images=None):
     provider = getattr(llm, "solve", llm.generate)
-    result = provider(question, [{"id": source.citation_id, "text": source.text} for source in sources])
+    evidence = [{"id": source.citation_id, "text": source.text} for source in sources]
+    result = provider(question, evidence, images=images) if images else provider(question, evidence)
     if result.content.insufficient_evidence:
         result.content = result.content.model_copy(update={"answer_basis": "unanswered"})
-    elif not sources and not result.content.citation_ids:
+    elif not result.content.citation_ids and not re.search(r"\[S\d+\]", result.content.answer):
         result.content = result.content.model_copy(update={"answer_basis": "model"})
+    elif result.content.answer_basis in {"materials", "mixed"}:
+        # Some providers declare valid sources but omit their inline markers.
+        # Repair only that formatting omission, never unknown or conflicting IDs.
+        declared = set(result.content.citation_ids)
+        available = {source.citation_id for source in sources}
+        inline = set(re.findall(r"\[(S\d+)\]", result.content.answer))
+        if declared and declared.issubset(available) and inline.issubset(declared):
+            missing = list(dict.fromkeys(
+                ref for ref in result.content.citation_ids if ref not in inline
+            ))
+            if missing:
+                result.content = result.content.model_copy(update={
+                    "answer": result.content.answer + "\n\n资料依据：" + " ".join(
+                        f"[{ref}]" for ref in missing
+                    ),
+                })
     return result

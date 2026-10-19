@@ -21,6 +21,7 @@ from app.services.generation import GenerationService
 from app.services.ingestion import IngestionService
 from app.services.learning import LearningService
 from app.services.material_learning import MaterialLearningService
+from app.services.pdf_visuals import PDFVisuals
 from app.services.qa import QAService
 
 logger = logging.getLogger("studyagent")
@@ -40,7 +41,8 @@ def model_services(state, settings):
         model_http = UnconfiguredModelClient()
     exams = ExamService(settings, state.sessions, ExamExtractor(settings, model_http))
     ingestion = IngestionService(settings, state.sessions, state.embeddings, state.vectors, exams)
-    qa = QAService(settings, state.retriever, CompatibleLLM(settings, model_http))
+    visuals = PDFVisuals(settings, state.sessions)
+    qa = QAService(settings, state.retriever, CompatibleLLM(settings, model_http), visuals)
     generation = GenerationService(
         settings, state.sessions, state.retriever, exams, GenerationProvider(settings, model_http)
     )
@@ -55,6 +57,7 @@ def model_services(state, settings):
         generation,
         learning,
         material_learning,
+        visuals,
     )
     planner = DemoPlanner() if settings.study_mode == "demo" else APIPlanner(settings, model_http)
     if not hasattr(state, "agent_memory"):

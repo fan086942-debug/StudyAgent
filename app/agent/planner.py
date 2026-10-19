@@ -22,6 +22,8 @@ AGENT_PROMPT = """你是课程复习 Agent。根据用户任务自主选择工�
 历史 generated_questions 是上轮生成的题目；“第二题”若指生成练习，按该列表索引理解，结合教材检索解释，不当成历史试卷题号。
 普通知识问题或用户直接输入的题目用 answer_question，query 保留原题和必要条件。
 answer_question 会先检索可选教材依据，再调用真实模型；没有资料也可以解答。
+用户要求解答时，检索为空或资料不足不能直接结束，必须调用 answer_question 或 analyze_question。
+检索只负责找题和资料，不等于完成解答；不要用“当前资料范围没有检索到足够依据”替代模型解题。
 仅检索知识片段用 search_knowledge；文件位置用 locate_source；历史题目用 search_questions。
 解释某卷某题时先按 paper_name 与 number 搜索，必要时 get_question，再 analyze_question。
 章节题号（如 1.1、2.10）作为完整的 number 字符串传给工具，不要截取或重新编号。

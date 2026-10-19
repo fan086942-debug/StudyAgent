@@ -3,11 +3,16 @@ import logging
 import time
 from uuid import uuid4
 
-from app.agent.intents import relation_intent, study_intent, topic_generation_intent
+from app.agent.intents import (
+    relation_intent,
+    solution_requested,
+    study_intent,
+    topic_generation_intent,
+)
 from app.agent.planner import AGENT_PROMPT
 from app.agent.tools import TOOL_SPECS, ToolContext, valid_answer
 from app.core.errors import AppError
-from app.schemas.agent import AgentResponse, ToolTrace
+from app.schemas.agent import AgentResponse, AgentTurn, FunctionCall, ToolCall, ToolTrace
 from app.schemas.chat import SearchRequest
 
 logger = logging.getLogger("studyagent")
@@ -157,10 +162,39 @@ class StudyAgent:
                 break
             checkpoint()
             self._usage(usage, turn.usage)
+            # Retrieval is not a completed solution. If the planner tries to finish
+            # early, run one solver within this same request, using the real scope.
+            solving_attempted = any(
+                step.tool in {"answer_question", "analyze_question"} for step in trace
+            )
+            if (
+                not turn.calls and turn.final is not None
+                and self.settings.study_mode != "demo"
+                and solution_requested(request.question)
+                and not solving_attempted
+                and not context.learning_answer and not context.artifacts
+                and len(context.questions) <= 1
+                and (
+                    not valid_answer(turn.final, list(context.sources.values()), allow_model=True)
+                    or bool(context.questions)
+                    or any(source.file_type == "pdf" for source in context.sources.values())
+                    or not any(step.tool in {
+                        "search_knowledge", "locate_source", "search_questions", "get_question",
+                    } for step in trace)
+                )
+            ):
+                if context.questions:
+                    name, args = "analyze_question", {"question_id": next(iter(context.questions))}
+                else:
+                    name, args = "answer_question", {"query": request.question}
+                turn = AgentTurn(calls=[ToolCall(
+                    id="solve-" + uuid4().hex,
+                    function=FunctionCall(name=name, arguments=json.dumps(args, ensure_ascii=False)),
+                )])
             if not turn.calls:
                 if (turn.final is not None and not turn.final.insufficient_evidence
                         and context.sources and not citation_repaired
-                        and not valid_answer(turn.final, list(context.sources.values()))):
+                        and not valid_answer(turn.final, list(context.sources.values()), allow_model=True)):
                     citation_repaired = True
                     messages.extend([
                         {"role": "assistant", "content": turn.final.model_dump_json()},
@@ -207,6 +241,7 @@ class StudyAgent:
                 before_artifacts, before_plans = dict(context.artifacts), dict(context.plans)
                 before_learning, before_answer = dict(context.learning), context.learning_answer
                 before_solution, before_solution_sources = context.solution, list(context.solution_sources)
+                before_solution_warning = context.solution_warning
                 try:
                     if key in cache:
                         output, state = cache[key], "cached"
@@ -227,6 +262,7 @@ class StudyAgent:
                     context.artifacts, context.plans = before_artifacts, before_plans
                     context.learning, context.learning_answer = before_learning, before_answer
                     context.solution, context.solution_sources = before_solution, before_solution_sources
+                    context.solution_warning = before_solution_warning
                     # 错误作为 observation 交回模型，让下一轮有机会修正参数或换工具。
                     state, output = "error", {"error": {"code": exc.code, "message": exc.message}}
                     observation = output
@@ -236,6 +272,7 @@ class StudyAgent:
                     context.artifacts, context.plans = before_artifacts, before_plans
                     context.learning, context.learning_answer = before_learning, before_answer
                     context.solution, context.solution_sources = before_solution, before_solution_sources
+                    context.solution_warning = before_solution_warning
                     logger.error(
                         "agent run=%s tool=%s error_type=%s", run_id, name, type(exc).__name__
                     )
@@ -292,6 +329,7 @@ class StudyAgent:
     def _finish(self, context, trace, usage, final, reason, warning, start) -> AgentResponse:
         sources = list(context.sources.values())
         questions = list(context.questions.values())
+        warning = warning or context.solution_warning
         answer, insufficient = (
             "当前资料范围没有检索到足够依据，请确认资料已完成处理，或明确需要学习的内容。",
             True,
@@ -331,7 +369,7 @@ class StudyAgent:
             else:
                 answer += "\n\n当前范围内没有检索到结果。"
             warning = warning or "规则规划用于离线演示；真实任务选择与推理需要 API 模式。"
-        elif final is not None and valid_answer(final, sources):
+        elif final is not None and valid_answer(final, sources, allow_model=True):
             answer, insufficient = final.answer, False
             answer_basis = final.answer_basis
             sources = [s for s in sources if s.citation_id in final.citation_ids]

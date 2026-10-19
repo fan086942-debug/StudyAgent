@@ -1,5 +1,19 @@
 import re
 
+
+def solution_requested(question):
+    """Separate solving from pure lookup and workspace management."""
+    if re.search(
+        r"查找|搜索|检索|定位|哪里|哪页|页码|哪些题|相关题|怎么考|考过|"
+        r"学习进度|错题本|复习计划|学习计划|列出|统计",
+        question,
+    ) and not re.search(r"解答|求解|给出答案|参考答案|解题步骤", question):
+        return False
+    return bool(re.search(
+        r"解答|回答|答题|做题|帮我做|解释|解析|分析|求解|计算|证明|推导|为什么|为何|如何|怎么|"
+        r"是什么|什么是|讲解|说明|答案|第\s*[\d一二三四五六七八九十百.]+\s*题|[?？]", question,
+    ))
+
 NUMBER = r"(?:\d+|[零一二两三四五六七八九十百]+)"
 COUNT = rf"({NUMBER})\s*(?:道(?:题目?)?|题目?)"
 NEGATED_GENERATION = (

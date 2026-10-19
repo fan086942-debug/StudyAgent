@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=200, ge=1, le=200)
     ocr_enabled: bool = True
     ocr_dpi: int = Field(default=180, ge=96, le=300)
+    pdf_visual_mode: Literal["auto", "enabled", "disabled"] = "auto"
+    pdf_visual_max_pages: int = Field(default=3, ge=1, le=6)
+    pdf_visual_max_edge: int = Field(default=2000, ge=1024, le=2400)
     chunk_size: int = Field(default=800, ge=100, le=2000)
     chunk_overlap: int = Field(default=120, ge=0)
     retrieval_candidates: int = Field(default=12, ge=1, le=50)

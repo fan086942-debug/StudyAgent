@@ -86,6 +86,7 @@ class ToolContext:
     learning_answer: str = ""
     solution: ModelAnswer | None = None
     solution_sources: list[Source] = field(default_factory=list)
+    solution_warning: str | None = None
     prior_questions: list[dict] = field(default_factory=list)
 
     def cite(self, sources: list[Source]) -> list[Source]:
@@ -111,11 +112,13 @@ class ToolRegistry:
         generation=None,
         learning=None,
         material_learning=None,
+        visuals=None,
     ):
         self.settings, self.sessions, self.retriever = settings, sessions, retriever
         self.exams, self.llm = exams, llm
         self.generation, self.learning = generation, learning
         self.material_learning = material_learning
+        self.visuals = visuals
 
     @staticmethod
     def schemas() -> list[dict]:
@@ -144,7 +147,11 @@ class ToolRegistry:
         # 课程和资料范围来自用户请求，由服务端注入；模型无权自行扩大检索范围。
         request = context.request
         if name == "answer_question":
-            return self._solve(args.query, self._knowledge(args.query, context), [], context)
+            evidence = self._knowledge(args.query, context)
+            # Preserve useful retrieval already performed by the planner.
+            if not evidence:
+                evidence = [s for s in context.sources.values() if s.document_type != "exam"][:6]
+            return self._solve(args.query, evidence, [], context)
         if name == "match_material_questions":
             result = self.material_learning.relations(
                 request.course_id,
@@ -279,6 +286,20 @@ class ToolRegistry:
             ids = list(session.scalars(statement))
         if not ids:
             return []
+        number = re.search(r"第\s*(\d+(?:[.．]\d+)*)\s*题", request.question)
+        if number and not locate:
+            # An exact exercise number should not depend on semantic similarity,
+            # including when a worksheet was uploaded as textbook rather than exam.
+            literal = self.retriever.locate(SearchRequest(
+                course_id=request.course_id, document_ids=ids, question=number[1],
+            ))
+            header = re.compile(
+                r"(?:^|\n)\s*(?:第\s*)?" + re.escape(number[1])
+                + r"(?:\s*题)?(?:[.．、:：)）](?!\d)|\s)",
+            )
+            matched = [source for source in literal.sources if header.search(source.text)]
+            if matched:
+                return context.cite(matched)
         retrieve = self.retriever.locate if locate else self.retriever.search
         result = retrieve(
             SearchRequest(course_id=request.course_id, document_ids=ids, question=query)
@@ -302,6 +323,7 @@ class ToolRegistry:
         )
 
     def _analyze(self, question, sources: list[Source], context: ToolContext) -> ToolResult:
+        primary_sources = list(sources)
         matched = self.material_learning.relations(
             context.request.course_id,
             RelationRequest(
@@ -351,14 +373,19 @@ class ToolRegistry:
         result = self._solve(
             "请分析以下试题，给出参考答案、关键步骤、涉及知识点。"
             "题目条件不完整时说明缺少哪些条件。试题：\n" + question.content,
-            evidence, sources, context,
+            evidence, primary_sources, context,
         )
         return result.model_copy(update={"questions": [question] + related})
 
     def _solve(self, question, evidence, question_sources, context):
         if self.settings.study_mode == "demo":
             return ToolResult(answer="请连接真实模型后解答。", insufficient_evidence=True)
-        result = solve(self.llm, question, evidence)
+        images, visual_warning = (
+            self.visuals.prepare(context.request, question_sources + evidence, self.llm)
+            if self.visuals else ([], None)
+        )
+        context.solution_warning = visual_warning
+        result = solve(self.llm, question, evidence, images=images)
         answer = result.content
         if answer.insufficient_evidence:
             # A concrete missing-condition explanation is useful, even without a solution.

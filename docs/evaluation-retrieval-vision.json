@@ -1,0 +1,58 @@
+{
+  "verified_on": "2026-10-19",
+  "real_api": "DeepSeek deepseek-flash",
+  "python_tests": 242,
+  "ruff": "passed",
+  "cases": {
+    "refusal_recovered_same_request_real_solver": {
+      "answer_basis": "model",
+      "insufficient_evidence": false,
+      "tool_names": [
+        "answer_question"
+      ],
+      "source_locations": []
+    },
+    "autonomous_first_question_no_materials": {
+      "answer_basis": "model",
+      "insufficient_evidence": false,
+      "tool_names": [
+        "answer_question"
+      ],
+      "source_locations": []
+    },
+    "raster_diagram_first_request": {
+      "answer_basis": "model",
+      "insufficient_evidence": false,
+      "tool_names": [
+        "search_questions",
+        "get_question",
+        "analyze_question"
+      ],
+      "source_locations": [
+        {
+          "type": "pdf_page",
+          "page": 1
+        }
+      ]
+    },
+    "textbook_category_default_threshold": {
+      "answer_basis": "materials",
+      "insufficient_evidence": false,
+      "tool_names": [
+        "search_questions",
+        "search_knowledge",
+        "answer_question"
+      ],
+      "source_locations": [
+        {
+          "type": "pdf_page",
+          "page": 1
+        }
+      ]
+    }
+  },
+  "image_input": "JPEG content parts were observed in the actual outgoing API request",
+  "synthetic_diagram_expected_path": "P -> T -> Q -> R",
+  "privacy": "Only original synthetic fixtures were sent for this round; no new user PDF content or credentials are included.",
+  "refusal_case_note": "The original refusal is simulated at the planner boundary; its recovery calls the real solver. Other cases use the real planner and solver."
+}

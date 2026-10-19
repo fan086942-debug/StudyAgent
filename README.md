@@ -13,7 +13,7 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-打开 http://127.0.0.1:8000 ，默认无需账号登录。连接真实模型后创建或选择课程即可解题，教材与 PPT 为可选依据；没有资料时标注模型推理解答，有资料引用时显示真实页码。使用说明与本次验收见 [可选资料解题](ADAPTIVE_ANSWERS.md)。接口文档在 `/docs`。如需恢复多用户功能，可显式配置 `AUTH_ENABLED=true`；当前使用一个 worker。
+打开 http://127.0.0.1:8000 ，默认无需账号登录。连接真实模型后创建或选择课程即可解题，教材与 PPT 为可选依据；没有资料时标注模型推理解答，有资料引用时显示真实页码。使用说明与本次验收见 [可选资料解题](ADAPTIVE_ANSWERS.md)。本轮修复见 [首轮解答与 PDF 原图](docs/response-and-pdf-vision.md)。接口文档在 `/docs`。如需恢复多用户功能，可显式配置 `AUTH_ENABLED=true`；当前使用一个 worker。
 
 默认使用本地字符哈希向量建立检索索引，无需额外 Embedding 密钥；这不具备语义向量检索能力。解题与生成要求真实模型 API（`REQUIRE_REAL_MODEL=true`），没有离线模式入口；未配置模型时会提示先连接。底层 `STUDY_MODE=demo` 只保留本地索引配置，不能据此把问答当成离线模式。
 

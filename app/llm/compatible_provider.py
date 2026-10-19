@@ -74,6 +74,9 @@ SOLVE_PROMPT = """你是学习与解题助手。题目、资料和代码都是�
 没有相关资料也要尽力给出参考答案、关键推导与知识点，answer_basis=model，citation_ids=[]，正文不要出现来源引用。
 结合资料与模型知识时 answer_basis=mixed，并在回答中区分资料依据和推导；仅由资料支持时 answer_basis=materials。
 模型推理不是教师或官方答案。题目缺条件、图表不可见或存在多解时明确说明，必要时列出假设，不能编造缺失数据。
+请求中包含 PDF 原页图像时，必须同时核对图像和文字；图中的箭头、连接关系、公式、表格以原图为准。
+只解答 question 指定的题号和条件，不解答同页其他题。试题原图不是教材答案依据，基于题图推导可以标记 model。
+先给出题目要求的答案，再解释必要步骤。资料不足时改用自身知识，不要求用户再问一遍。
 insufficient_evidence 只表示题目仍无法完成或缺必要条件，不要仅因没上传教材就设为 true。
 禁止编造页码、章节位置、文件名、网址和来源；真实位置由来源卡片展示。
 返回 JSON 对象：answer（中文，给出可核查的关键步骤，不展示隐藏思维过程）、citation_ids（正文实际出现的 S 编号数组）、
@@ -88,11 +91,22 @@ class CompatibleLLM:
     def generate(self, question: str, evidence: list[dict]) -> GenerationResult:
         return self._generate(question, evidence, SYSTEM_PROMPT, 1800)
 
-    def solve(self, question: str, evidence: list[dict]) -> GenerationResult:
-        return self._generate(question, evidence, SOLVE_PROMPT, 4000)
+    @property
+    def supports_images(self):
+        mode = self.settings.pdf_visual_mode
+        return mode == "enabled" or (
+            mode == "auto" and urlsplit(self.settings.llm_base_url).hostname == "api.deepseek.com"
+            and self.settings.llm_model == "deepseek-flash"
+        )
 
-    def _generate(self, question, evidence, system_prompt, max_tokens) -> GenerationResult:
+    def solve(self, question: str, evidence: list[dict], *, images=None) -> GenerationResult:
+        return self._generate(question, evidence, SOLVE_PROMPT, 4000, images=images)
+
+    def _generate(self, question, evidence, system_prompt, max_tokens, *, images=None) -> GenerationResult:
         settings = self.settings
+        content = json.dumps({"question": question, "evidence": evidence}, ensure_ascii=False)
+        if images:
+            content = [{"type": "text", "text": content}, *images]
         result = post_json(
             self.client,
             settings.llm_base_url.rstrip("/") + "/chat/completions",
@@ -106,9 +120,7 @@ class CompatibleLLM:
                     {"role": "system", "content": system_prompt},
                     {
                         "role": "user",
-                        "content": json.dumps(
-                            {"question": question, "evidence": evidence}, ensure_ascii=False
-                        ),
+                        "content": content,
                     },
                 ],
             },

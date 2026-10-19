@@ -9,8 +9,9 @@ NO_EVIDENCE = "当前资料中未找到可靠来源。"
 
 
 class QAService:
-    def __init__(self, settings, retriever, llm):
+    def __init__(self, settings, retriever, llm, visuals=None):
         self.settings, self.retriever, self.llm = settings, retriever, llm
+        self.visuals = visuals
 
     def answer(self, request: SearchRequest) -> ChatResponse:
         start = time.perf_counter()
@@ -27,7 +28,8 @@ class QAService:
         elif self.settings.study_mode != "demo":
             llm_start = time.perf_counter()
             # 将筛选后的正文与引用编号交给模型，真实文件位置由后端的 Source 提供。
-            result = solve(self.llm, request.question, sources)
+            images, warning = self.visuals.prepare(request, sources, self.llm) if self.visuals else ([], None)
+            result = solve(self.llm, request.question, sources, images=images)
             llm_ms = (time.perf_counter() - llm_start) * 1000
             usage = result.usage
             content = result.content
