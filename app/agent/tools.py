@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.agent.intents import generation_requested, study_intent
 from app.core.errors import AppError
+from app.llm.base import ModelAnswer
 from app.models import Document
 from app.schemas.agent import KnowledgeArgs, QuestionArgs, ToolResult
 from app.schemas.chat import SearchRequest, Source
@@ -19,9 +20,14 @@ from app.schemas.generation import (
 )
 from app.schemas.learning import LearningArgs, PlanArgs, WrongListArgs
 from app.schemas.material_learning import RelationArgs, RelationRequest
+from app.services.answering import solve, valid_answer
 from app.services.material_study import generate_study_pack
 
 TOOL_SPECS = {
+    "answer_question": (
+        KnowledgeArgs,
+        "回答普通学习问题或用户直接输入的题目。先查找可选教材依据，有依据时引用真实资料；没有资料时调用真实模型推理解答并明确标注。query 应保留用户题目条件。查到试卷题目后用 analyze_question。",
+    ),
     "match_material_questions": (
         RelationArgs,
         "双向匹配教材/课件/笔记与已解析试卷题目。material_to_exam 从资料找题；exam_to_material 从试题找资料。返回真实来源、匹配知识点及候选关联，不生成答案。query 可用知识点，留空按整个范围匹配。",
@@ -64,7 +70,7 @@ TOOL_SPECS = {
     "get_question": (QuestionArgs, "根据搜索返回的 question_id 获取原题、选项、知识点和真实来源。"),
     "analyze_question": (
         QuestionArgs,
-        "结合教材检索分析已找到的题目，返回参考答案、解析及相关题；必须使用已查询到的 question_id。",
+        "分析已找到的题目，返回模型参考答案、解析及相关题；教材是可选依据，有引用时提供真实来源。必须使用已查询到的 question_id。",
     ),
 }
 
@@ -78,6 +84,8 @@ class ToolContext:
     plans: dict = field(default_factory=dict)
     learning: dict = field(default_factory=dict)
     learning_answer: str = ""
+    solution: ModelAnswer | None = None
+    solution_sources: list[Source] = field(default_factory=list)
     prior_questions: list[dict] = field(default_factory=list)
 
     def cite(self, sources: list[Source]) -> list[Source]:
@@ -135,6 +143,8 @@ class ToolRegistry:
             ) from exc
         # 课程和资料范围来自用户请求，由服务端注入；模型无权自行扩大检索范围。
         request = context.request
+        if name == "answer_question":
+            return self._solve(args.query, self._knowledge(args.query, context), [], context)
         if name == "match_material_questions":
             result = self.material_learning.relations(
                 request.course_id,
@@ -330,13 +340,6 @@ class ToolRegistry:
                 insufficient_evidence=True,
                 answer="演示模式未调用 LLM，仅提供原题、相关资料和关联试题，未生成参考答案。",
             )
-        if not evidence:
-            return ToolResult(
-                sources=sources,
-                questions=[question] + related,
-                insufficient_evidence=True,
-                answer="当前资料中未找到可靠来源，无法生成有依据的参考答案。",
-            )
         if len(question.content) > 6000:
             # 不能静默截掉题目后半段；那里可能包含计算条件或选项，缺失会改变答案。
             return ToolResult(
@@ -345,40 +348,42 @@ class ToolRegistry:
                 insufficient_evidence=True,
                 answer="题目超过单次分析长度上限，请按子题拆分后分析。",
             )
-        result = self.llm.generate(
-            "请分析以下试题，分为参考答案、详细解析、涉及知识点。答案是基于资料推导的参考答案，不冒充官方答案。"
-            "缺少条件或资料不支持时明确拒答。试题：\n" + question.content,
-            [{"id": source.citation_id, "text": source.text} for source in evidence],
+        result = self._solve(
+            "请分析以下试题，给出参考答案、关键步骤、涉及知识点。"
+            "题目条件不完整时说明缺少哪些条件。试题：\n" + question.content,
+            evidence, sources, context,
         )
+        return result.model_copy(update={"questions": [question] + related})
+
+    def _solve(self, question, evidence, question_sources, context):
+        if self.settings.study_mode == "demo":
+            return ToolResult(answer="请连接真实模型后解答。", insufficient_evidence=True)
+        result = solve(self.llm, question, evidence)
         answer = result.content
-        if not valid_answer(answer, evidence):
+        if answer.insufficient_evidence:
+            # A concrete missing-condition explanation is useful, even without a solution.
+            if not answer.citation_ids and not re.search(r"\[S\d+\]", answer.answer):
+                context.solution = answer
+                context.solution_sources = question_sources
             return ToolResult(
-                sources=sources,
-                questions=[question] + related,
+                sources=question_sources, answer=answer.answer,
+                answer_basis="unanswered", insufficient_evidence=True, usage=result.usage or {},
+            )
+        if not valid_answer(answer, evidence, allow_model=True):
+            return ToolResult(
+                sources=question_sources,
+                answer_basis="unanswered",
                 insufficient_evidence=True,
-                answer="当前资料不足或模型引用无效，未生成可靠解析。",
+                answer="模型解答未通过来源校验，请重试。",
                 usage=result.usage or {},
             )
+        context.solution = answer
+        references = [source for source in evidence if source.citation_id in answer.citation_ids]
+        originals = [source for source in question_sources if source.document_type == "exam"]
+        context.solution_sources = list({source.chunk_id: source for source in originals + references}.values())
         return ToolResult(
-            sources=sources,
-            questions=[question] + related,
+            sources=context.solution_sources,
             answer=answer.answer,
-            insufficient_evidence=answer.insufficient_evidence,
+            answer_basis=answer.answer_basis,
             usage=result.usage or {},
         )
-
-
-def valid_answer(answer, sources: list[Source]) -> bool:
-    if answer.insufficient_evidence:
-        return False
-    available = {source.citation_id for source in sources}
-    claimed = set(answer.citation_ids)
-    inline = set(re.findall(r"\[(S\d+)\]", answer.answer))
-    # 引用必须既出现在正文，也属于实际观察到的证据；位置事实交给来源卡片展示。
-    return bool(
-        answer.answer.strip()
-        and claimed
-        and claimed == inline
-        and claimed.issubset(available)
-        and not re.search(r"第\s*[\d一二三四五六七八九十百]+\s*[页章]", answer.answer)
-    )

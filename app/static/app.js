@@ -259,7 +259,7 @@ $("upload-form").addEventListener("submit", async (event) => {
 });
 $("question-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!currentCourse) return status("请先选择课程并上传资料。", true);
+  if (!currentCourse) return status("请先创建或选择课程。", true);
   const courseId = currentCourse, epoch = scopeEpoch, askId = ++askEpoch;
   questionController?.abort(); questionController = new AbortController();
   const body = { course_id: courseId, question: $("question").value.trim() };
@@ -292,6 +292,14 @@ function renderResult(result) {
     }
     refreshProgress().catch(() => {});
     $("answer").replaceChildren(window.studyReader ? window.studyReader.renderAnswer(result) : document.createTextNode(result.answer)); $("warning").textContent = result.warning || "";
+    const basisLabels = {
+      model: "模型推理解答 · 未引用教材或课件",
+      materials: "基于资料解答 · 来源页码见下方引用",
+      mixed: "资料与模型推理解答 · 来源页码见下方引用",
+    };
+    if (!result.insufficient_evidence && basisLabels[result.answer_basis]) {
+      $("answer").prepend(element("p", basisLabels[result.answer_basis], "scope-summary answer-origin"));
+    }
     $("timing").textContent = `${result.trace ? `工具 ${result.trace.length} 次 · ` : ""}总计 ${Math.round(result.total_ms || 0)} ms${result.usage?.total_tokens ? ` · 模型报告用量 ${result.usage.total_tokens} tokens` : ""}`;
     $("trace").replaceChildren();
     $("trace-panel").hidden = !result.trace?.length;
@@ -314,7 +322,7 @@ function renderResult(result) {
     for (const source of result.sources) {
       const card = sourceCard(source); card.dataset.citation = source.citation_id; $("sources").append(card);
     }
-    if (!result.sources.length) $("sources").append(element("p", "没有可展示的可靠引用。可补充资料或换一种问法。", "empty"));
+    if (!result.sources.length) $("sources").append(element("p", result.answer_basis === "model" ? "本次由模型推理解答，未引用课程资料。上传相关教材或课件后可补充来源页码。" : "本次没有引用课程资料。", "empty"));
     window.studyReader?.update(result);
     $("result").hidden = false; $("welcome").hidden = true; status("处理完成。");
 }
@@ -362,10 +370,10 @@ function renderQuestions(questions, target) {
     card.append(element("p", `${types[question.type]} · 分值 ${question.score ?? "未标注"} · 难度 ${difficulties[question.difficulty]} · 知识点：${question.knowledge_points.join("、") || "未标注"}`, "hint"));
     const locate = element("button", "定位教材 / 课件依据", "secondary"); locate.type = "button";
     locate.addEventListener("click", () => openRelations({direction: "exam_to_material", question_id: question.id, exam_document_ids: [question.document_id]}, locate));
-    const button = element("button", "查看资料并分析此题", "secondary"); button.type = "button";
+    const button = element("button", "解答此题", "secondary"); button.type = "button";
     button.addEventListener("click", async () => {
       const courseId = currentCourse;
-      button.disabled = true; status("正在检索课程资料并分析题目…");
+      button.disabled = true; status("正在调用模型解题，并检查可选资料依据…");
       const body = {course_id: courseId, question: `分析第 ${question.number} 题`};
       if (selected.size) body.document_ids = [...selected];
       try {
@@ -400,17 +408,16 @@ async function start() {
     maxUploadMb = health.max_upload_mb || 200;
     document.querySelector(".upload-hint").textContent = `${health.ocr_enabled ? "扫描 PDF 自动 OCR" : "文本型文件"} · 单文件上限 ${maxUploadMb} MB`;
     updateModelMode(health.mode);
-    try { const profile = await api("/api/connection"); updateModelMode(profile.mode, profile.model); } catch {}
+    try { const profile = await api("/api/connection"); updateModelMode(profile.mode, profile.model, profile.configured); } catch {}
     await loadCourses();
   } catch (error) { status(error.message, true); }
 }
 
-function updateModelMode(mode, model = "") {
-  const demo = mode === "demo";
-  $("mode").textContent = demo ? "演示模式 · 连接模型 ↗" : "API 模式 ↗";
-  $("mode").classList.toggle("live", !demo);
-  $("mode").title = demo ? "点击配置模型 API" : `${model || "模型 API"} · 点击管理连接`;
-  $("mode-note").textContent = demo ? "演示模式：使用资料原文摘录。连接模型后，可获得完整的分析与回答。" : `已连接${model ? ` ${model}` : "学习模型"}。回答基于资料，可查看引用原文。`;
+function updateModelMode(mode, model = "", configured = mode === "api" && !!model) {
+  $("mode").textContent = configured ? "API 模式 ↗" : "连接模型 ↗";
+  $("mode").classList.toggle("live", configured);
+  $("mode").title = configured ? `${model} · 点击管理连接` : "点击配置真实模型 API";
+  $("mode-note").textContent = configured ? `已连接 ${model}。可直接解题；引用相关教材或课件时会附来源页码。` : "连接真实模型后开始问答、试卷解析和复习生成。";
 }
 
 
@@ -529,7 +536,7 @@ $("generation-kind").addEventListener("change", () => {
 });
 $("generation-form").addEventListener("submit", async event => {
   event.preventDefault();
-  if (!currentCourse) return status("请先选择课程并上传资料。", true);
+  if (!currentCourse) return status("请先创建或选择课程。", true);
   const courseId = currentCourse, epoch = scopeEpoch;
   const topics = $("generation-topics").value.split(/[,，、;；\n]/).map(s => s.trim()).filter(Boolean);
   const body = {
@@ -575,7 +582,8 @@ function sourceCard(source) {
   link.href = source.file_url; link.target = "_blank"; link.rel = "noopener";
   const location = source.location_type === "pdf_page" ? `PDF 物理第 ${source.page} 页` :
     source.location_type === "slide" ? `第 ${source.page} 张幻灯片` : `第 ${source.block_index} 个段落 / 表格块`;
-  card.append(link, element("small", location + (source.section ? ` · ${source.section}` : "")));
+  const sourceKind = source.document_type === "exam" ? "试题原文" : "参考资料";
+  card.append(link, element("small", sourceKind + " · " + location + (source.section ? ` · ${source.section}` : "")));
   const details = element("details"); details.append(element("summary", "展开原文"), element("p", source.text, "question-text"));
   card.append(element("p", source.text.slice(0, 260) + (source.text.length > 260 ? "…" : "")), details);
   return card;
@@ -1056,7 +1064,7 @@ $("include-mastered").addEventListener("change", () => loadWrongs().catch(error 
 $("more-wrongs").addEventListener("click", () => loadWrongs(true).catch(error => status(error.message, true)));
 $("more-plans").addEventListener("click", () => loadPlans(true).catch(error => status(error.message, true)));
 $("plan-form").addEventListener("submit", async event => {
-  event.preventDefault(); if (!currentCourse) return status("请先选择课程并上传资料。", true);
+  event.preventDefault(); if (!currentCourse) return status("请先创建或选择课程。", true);
   const course = currentCourse, epoch = scopeEpoch; $("plan-button").disabled = true;
   const body = {topics: $("plan-topics").value.split(/[,，、;；\n]/).map(t => t.trim()).filter(Boolean), days: Number($("plan-days").value), daily_minutes: Number($("plan-minutes").value)};
   if (selected.size) body.document_ids = [...selected];

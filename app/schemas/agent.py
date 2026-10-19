@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.llm.base import ModelAnswer
+from app.llm.base import AnswerBasis, ModelAnswer
 from app.schemas.chat import SearchRequest, Source
 from app.schemas.exam import QuestionOut
 from app.schemas.generation import ArtifactSummary
@@ -30,6 +30,7 @@ class AgentTurn(BaseModel):
 
 
 class ToolResult(BaseModel):
+    answer_basis: AnswerBasis = "materials"
     learning: dict = Field(default_factory=dict)
     plans: list[dict] = Field(default_factory=list)
     artifacts: list[ArtifactSummary] = Field(default_factory=list)
@@ -52,6 +53,7 @@ class ToolTrace(BaseModel):
 
 
 class AgentResponse(BaseModel):
+    answer_basis: AnswerBasis = "materials"
     conversation_id: str | None = None
     session_id: str | None = None
     context_turns: int = 0

@@ -26,13 +26,23 @@ from app.services.qa import QAService
 logger = logging.getLogger("studyagent")
 
 
+class UnconfiguredModelClient:
+    def post(self, *_args, **_kwargs):
+        raise AppError("connection_required", "请先在模型连接中填写模型和 API Key 并保存", 422)
+
+
 def model_services(state, settings):
     """Rebind the entire model graph while preserving database and embedding space."""
-    exams = ExamService(settings, state.sessions, ExamExtractor(settings, state.http))
+    model_http = state.http
+    if settings.study_mode != "demo" and (
+        not settings.llm_model or not settings.llm_api_key.get_secret_value()
+    ):
+        model_http = UnconfiguredModelClient()
+    exams = ExamService(settings, state.sessions, ExamExtractor(settings, model_http))
     ingestion = IngestionService(settings, state.sessions, state.embeddings, state.vectors, exams)
-    qa = QAService(settings, state.retriever, CompatibleLLM(settings, state.http))
+    qa = QAService(settings, state.retriever, CompatibleLLM(settings, model_http))
     generation = GenerationService(
-        settings, state.sessions, state.retriever, exams, GenerationProvider(settings, state.http)
+        settings, state.sessions, state.retriever, exams, GenerationProvider(settings, model_http)
     )
     learning = LearningService(state.sessions, exams, generation)
     material_learning = MaterialLearningService(state.sessions, exams, state.retriever)
@@ -46,7 +56,7 @@ def model_services(state, settings):
         learning,
         material_learning,
     )
-    planner = DemoPlanner() if settings.study_mode == "demo" else APIPlanner(settings, state.http)
+    planner = DemoPlanner() if settings.study_mode == "demo" else APIPlanner(settings, model_http)
     if not hasattr(state, "agent_memory"):
         state.agent_memory = AgentMemory(state.sessions)
     return dict(
@@ -85,7 +95,9 @@ class ModelConnection:
                     model=defaults.llm_model,
                     api_key=defaults.llm_api_key,
                 )
-        settings = self._settings(self.profile) if self.path.exists() else defaults
+        if defaults.require_real_model and self.profile.mode == "demo":
+            self.profile = self.profile.model_copy(update={"mode": "api"})
+        settings = self._settings(self.profile)
         self._bind(model_services(state, settings))
 
     def _settings(self, profile):
@@ -110,6 +122,8 @@ class ModelConnection:
 
     def resolve(self, body):
         with self.lock:
+            if self.defaults.require_real_model and body.mode != "api":
+                raise AppError("offline_disabled", "当前仅支持真实模型 API，请填写模型连接", 422)
             key = body.api_key.get_secret_value()
             if not key and self.profile.api_key.get_secret_value():
                 if body.base_url != self.profile.base_url:
@@ -130,14 +144,20 @@ class ModelConnection:
             "base_url": self.profile.base_url,
             "model": self.profile.model,
             "has_api_key": bool(self.profile.api_key.get_secret_value()),
+            "configured": bool(self.profile.model and self.profile.api_key.get_secret_value()),
             "embedding_mode": embedding_settings.study_mode,
             "embedding_model": embedding_settings.embedding_model
             if embedding_settings.study_mode == "api"
             else "本地字词检索",
         }
 
-    def enter_request(self):
+    def enter_request(self, *, require_model=False):
         with self.lock:
+            if require_model and self.defaults.require_real_model:
+                if not self.profile.model or not self.profile.api_key.get_secret_value():
+                    raise AppError(
+                        "connection_required", "请先在模型连接中填写模型和 API Key 并保存", 422
+                    )
             if self.exclusive_business:
                 raise AppError("course_busy", "正在删除课程，请稍后再操作", 409)
             self.active_requests += 1

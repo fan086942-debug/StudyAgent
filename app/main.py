@@ -105,7 +105,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 request.state.services = await run_in_threadpool(app.state.workspaces.get, user)
             connection = getattr(request.state.services, "connection", None)
             if connection and is_api and not is_auth and not path.startswith("/api/connection"):
-                connection.enter_request()
+                connection.enter_request(require_model=(
+                    path in {"/api/agent", "/api/agent/stream", "/api/chat", "/api/generate", "/api/study"}
+                    or path.endswith(("/analyze", "/extract-questions"))
+                ))
                 entered = True
             response = await call_next(request)
         except AppError as exc:
@@ -175,7 +178,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok",
             "mode": app.state.settings.study_mode,
             "version": "0.4.0",
-            "build": "20261013-fast-workspace",
+            "build": "20261019-adaptive-answers",
             "commit": os.environ.get("RENDER_GIT_COMMIT", "local"),
             "max_upload_mb": settings.max_upload_mb,
             "ocr_enabled": settings.ocr_enabled,

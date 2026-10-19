@@ -129,6 +129,7 @@ class AgentMemory:
             id=result.conversation_id,
             question=request.question,
             answer=result.answer[:4000],
+            answer_basis=result.answer_basis,
             topics=[],
             generated_questions=[],
         )

@@ -22,21 +22,24 @@ def local_access(request: Request):
         raise AppError("connection_origin", "请从当前学习工作台设置模型连接", 403)
 
 
-router = APIRouter(
-    prefix="/api/connection", tags=["connection"], dependencies=[Depends(local_access)]
-)
+router = APIRouter(prefix="/api/connection", tags=["connection"])
 
 
 @router.get("")
 def read_connection(request: Request):
-    return request.state.services.connection.describe()
+    result = request.state.services.connection.describe()
+    loopback = {"127.0.0.1", "localhost", "::1"}
+    result["editable"] = request.app.state.settings.auth_enabled or bool(
+        request.client and request.client.host in loopback and request.url.hostname in loopback
+    )
+    return result
 
 
-@router.put("")
+@router.put("", dependencies=[Depends(local_access)])
 def save_connection(body: ConnectionInput, request: Request):
     return request.state.services.connection.save(body)
 
 
-@router.post("/test")
+@router.post("/test", dependencies=[Depends(local_access)])
 def test_connection(body: ConnectionInput, request: Request):
     return request.state.services.connection.test(body)

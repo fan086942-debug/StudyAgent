@@ -14,3 +14,9 @@ models-cache/
 build/
 dist/
 *.log
+
+# Local acceptance artifacts may contain uploaded question text.
+/adaptive-api-verification.json
+/adaptive-browser-verification.json
+/adaptive-model-ui.png
+/adaptive-slides-ui.png

@@ -74,7 +74,7 @@
     const guest = document.body.dataset.auth === 'guest';
     $('workspace-course').textContent=guest?'连接你的学习资料':currentCourse?$('course').selectedOptions[0]?.textContent:'选择一门课程';
     const ready=libraryDocuments.filter(doc=>doc.status==='ready').length;
-    $('workspace-scope').textContent=guest?'登录后，课程、对话与练习保存在同一空间':!currentCourse?'在资料库创建课程或选择已有课程':selected.size?`限定 ${selected.size} 份资料 · 回答附原文位置`:`${ready} 份可用资料 · 使用当前课程全部范围`;
+    $('workspace-scope').textContent=guest?'登录后，课程、对话与练习保存在同一空间':!currentCourse?'在资料库创建课程或选择已有课程':selected.size?`限定 ${selected.size} 份资料 · 引用附原文位置`:ready?`${ready} 份可用资料 · 使用当前课程全部范围`:'可直接解题 · 上传教材或课件可补充来源页码';
     $('workspace-memory').textContent=guest?'专属学习空间':'上下文自动保存';
     $('workspace-library').setAttribute('aria-label',guest?'登录并连接学习资料':'管理当前课程与资料范围');
   }

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from app.llm.base import AnswerBasis
 from app.schemas.document import TextBlock
 
 
@@ -29,6 +30,7 @@ class SearchResponse(BaseModel):
 class ChatResponse(BaseModel):
     conversation_id: str | None = None
     answer: str
+    answer_basis: AnswerBasis = "materials"
     sources: list[Source]
     mode: str
     insufficient_evidence: bool

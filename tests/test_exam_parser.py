@@ -60,3 +60,38 @@ def test_question_number_is_not_a_score_or_year():
     verify_number("12", "（12）解释 A*")
     with pytest.raises(AppError, match="题号"):
         verify_number("2", "1. 解释 A*（2分）")
+
+
+def test_chapter_question_numbers_and_code_are_preserved():
+    text = "第一章 操作系统\n习题\n1.1 定义操作系统。\n1.2 说明 I/O。\n第二章 进程管理\n习题\n2.10 [必做]修改代码：\nwait(full);\nsignal(mutex);\n2.11 解释线程。"
+    questions = rule_extract(text)
+    assert [q.number for q in questions] == ["1.1", "1.2", "2.10", "2.11"]
+    assert questions[1].source_text == "1.2 说明 I/O。"
+    assert "wait(full);\nsignal(mutex);" in questions[2].source_text
+    for question in questions:
+        verify_number(question.number, question.source_text)
+    with pytest.raises(AppError):
+        verify_number("2", "2.10 [必做]修改代码：")
+    windows = extraction_windows(text, 65)
+    assert any(window.startswith("2.10") for _, window in windows)
+    assert all(len(window) <= 65 for _, window in windows)
+
+
+def test_quote_layout_normalization_keeps_math_and_source_offsets():
+    text = "前文\n２．１０ [必做]Ａ（x）＝x²\u200b + 1；\n后文"
+    start, end = locate_quote(text, "2.10 [必做]A(x)=x² + 1;")
+    assert text[start:end] == "２．１０ [必做]Ａ（x）＝x²\u200b + 1；"
+    for fabricated in ["2.10 [必做]A(x)=x2 + 1;", "2.10 [必做]A(x)=x² - 1;"]:
+        with pytest.raises(AppError):
+            locate_quote(text, fabricated)
+
+
+def test_pdf_page_counters_removed_but_locations_preserved():
+    parsed = build_exam_text([
+        TextBlock(text="第 3 页 共 10 页\n2.1 跨页题目开始", page=3, location_type="pdf_page"),
+        TextBlock(text="第 4 页 共 10 页\n接着上一页的代码。\n2.2 下一题", page=4, location_type="pdf_page"),
+    ])
+    question = rule_extract(parsed.text)[0]
+    assert question.number == "2.1" and "第 4 页" not in question.source_text
+    start, end = locate_quote(parsed.text, question.source_text)
+    assert [location["page"] for location in parsed.locations(start, end)] == [3, 4]

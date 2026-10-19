@@ -15,7 +15,7 @@
     const apiMode = $("connection-mode").value === "api";
     $("connection-model").required = apiMode;
     $("connection-key").required = apiMode && !(profile?.has_api_key && profile.base_url === $("connection-url").value.trim().replace(/\/+$/, ""));
-    $("connection-save").textContent = apiMode ? "保存并启用 ↗" : "切换为演示模式 ↗";
+    $("connection-save").textContent = "保存并启用 ↗";
     let deepseek = false;
     try { deepseek = new URL($("connection-url").value.trim()).hostname === "api.deepseek.com"; } catch {}
     $("connection-model-hint").textContent = deepseek ? "DeepSeek Flash 的 API 模型 ID 为 deepseek-flash，请不要填写 DeepSeek-V4.1-Flash。" : "填写 API 模型 ID，不是官网的展示名称。";
@@ -23,7 +23,7 @@
   }
   function fillProfile(data, prepareApi = false) {
     profile = data;
-    $("connection-mode").value = prepareApi && data.mode === "demo" ? "api" : data.mode;
+    $("connection-mode").value = "api";
     $("connection-url").value = data.base_url;
     $("connection-model").value = data.model;
     clearKey();
@@ -37,13 +37,13 @@
     if (!dialog.open) dialog.showModal();
     message("正在读取连接设置…");
     setBusy(true);
-    try { fillProfile(await api("/api/connection"), true); message(""); }
+    try { fillProfile(await api("/api/connection"), true); message(profile.editable === false ? "当前模型由服务管理员管理。" : ""); }
     catch (error) { message(error.message, true); }
     finally { setBusy(false); }
   }
   function setBusy(value) {
     busy = value;
-    [...form.elements].forEach(control => { control.disabled = value; });
+    [...form.elements].forEach(control => { control.disabled = value || profile?.editable === false; });
     dialog.setAttribute("aria-busy", String(value));
   }
   function body() {
@@ -71,8 +71,8 @@
     setBusy(true); message("正在保存连接…");
     try {
       const data = await api("/api/connection", {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)});
-      fillProfile(data); updateModelMode(data.mode, data.model);
-      const text = data.mode === "api" ? `已启用 ${data.model}。关闭面板后即可开始提问。` : "已切换为离线演示。";
+      fillProfile(data); updateModelMode(data.mode, data.model, data.configured);
+      const text = `已启用 ${data.model}。关闭面板后即可开始提问。`;
       if (dialog.open) message(text);
       notify(text);
     } catch (error) { if (dialog.open) message(error.message, true); }

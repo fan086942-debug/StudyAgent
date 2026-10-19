@@ -5,7 +5,7 @@ COUNT = rf"({NUMBER})\s*(?:道(?:题目?)?|题目?)"
 NEGATED_GENERATION = (
     r"(?:不要|不用|不需要|无需|不必|别).{0,12}(?:出|生成|制作|准备).{0,20}(?:题|卷|复习)"
 )
-EXAM_ACTION = rf"(?:生成|制作|准备).{{0,160}}(?:题|卷)|出\s*(?:{NUMBER}\s*(?:道|题|套|份)|题|卷)|再(?:来|给我)?\s*{NUMBER}\s*(?:道|题)|模拟卷|模拟试卷"
+EXAM_ACTION = rf"(?:生成|制作|准备).{{0,160}}(?:题|卷)|出\s*{NUMBER}\s*(?:道|题|套|份)|(?<![给列提指])出\s*(?:题|卷)|再(?:来|给我)?\s*{NUMBER}\s*(?:道|题)|模拟卷|模拟试卷"
 
 
 def question_count(question):
@@ -100,8 +100,9 @@ def study_intent(question):
     """Route explicit whole-material learning, independently of file format."""
     action = bool(
         re.search(
-            r"提取|摘取|抽取|提炼|概括|整理|总结|归纳|梳理|生成|制作|准备|出.*(?:卷|题)", question
+            r"提取|摘取|抽取|提炼|概括|整理|总结|归纳|梳理|生成|制作|准备", question
         )
+        or re.search(EXAM_ACTION, question)
     )
     material = bool(
         re.search(
@@ -111,7 +112,7 @@ def study_intent(question):
         )
     )
     chapters = bool(re.search(r"每[章张]|各章|逐章|各个章节|每个章节", question))
-    exam = bool(re.search(r"复习卷|卷子|(?:生成|制作|出|准备).*(?:卷|题)", question))
+    exam = bool(re.search(EXAM_ACTION + r"|复习卷|卷子", question))
     if re.search(NEGATED_GENERATION, question):
         exam = False
     knowledge = bool(

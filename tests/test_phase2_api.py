@@ -72,6 +72,48 @@ def test_api_extract_rejects_invented_text_atomically(exam_app):
     assert client.post(f"/api/courses/{course}/questions/search", json={}).json() == []
 
 
+def test_exam_provider_corrects_copying_once_and_restores_source_order():
+    text = "1.1 什么是进程？\n2.10 [必做]修改代码：\nwait(full);\nsignal(mutex);"
+    first, second = text.split("\n", 1)
+    calls = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        questions = ([{"number": "1.1", "source_text": "1.1 请解释进程。"}]
+                     if len(calls) == 1 else [
+                         {"number": "2.10", "source_text": second.replace("：", ":")},
+                         {"number": "1.1", "source_text": first.replace("？", "?")},
+                     ])
+        return httpx.Response(200, json={"choices": [{"message": {
+            "content": json.dumps({"questions": questions}),
+        }}]})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        result = ExamExtractor(Settings(_env_file=None), client).extract(text)
+    assert len(calls) == 2
+    assert calls[1]["messages"][-1]["role"] == "user"
+    assert [question.number for question in result.questions] == ["1.1", "2.10"]
+    assert [question.source_text for question in result.questions] == [first, second]
+
+
+def test_exam_provider_still_rejects_fabrication_after_bounded_correction():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {
+            "content": json.dumps({"questions": [{
+                "number": "1.1", "source_text": "1.1 编造题目。",
+            }]}),
+        }}]})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(AppError) as error:
+            ExamExtractor(Settings(_env_file=None), client).extract("1.1 原文题目。")
+    assert error.value.code == "exam_unverified_text" and len(calls) == 2
+
+
 def test_multiformat_exam_extract_and_full_demo_chain(exam_app, tmp_path):
     app, client, course, _ = exam_app
     for path in generate(tmp_path / "samples"):

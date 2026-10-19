@@ -162,7 +162,9 @@ def test_invalid_config_busy_and_atomic_failure(connected_app, monkeypatch):
 
 def test_local_and_same_origin_only(connected_app):
     _, client = connected_app
-    assert client.get("/api/connection", headers={"host": "attacker.example"}).status_code == 403
+    read_only = client.get("/api/connection", headers={"host": "attacker.example"})
+    assert read_only.status_code == 200 and read_only.json()["editable"] is False
+    assert "api_key" not in read_only.json()
     assert (
         client.put(
             "/api/connection", json=profile(), headers={"origin": "https://other.example"}

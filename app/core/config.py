@@ -11,7 +11,8 @@ class Settings(BaseSettings):
 
     study_mode: Literal["demo", "api"] = "demo"
     data_dir: Path = Path("data")
-    auth_enabled: bool = True
+    require_real_model: bool = True
+    auth_enabled: bool = False
     auth_registration_enabled: bool = True
     auth_cookie_secure: bool = Field(default_factory=lambda: os.environ.get("RENDER") == "true")
     auth_allow_remote_setup: bool = Field(default_factory=lambda: os.environ.get("RENDER") == "true")

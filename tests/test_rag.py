@@ -62,7 +62,7 @@ def test_qa_citation_and_insufficiency_guard():
         ("使用队列 [S1]", ["S1"], False, "使用队列 [S1]"),
         ("使用队列 [S99]", ["S99"], False, NO_EVIDENCE),
         ("资料第999页 [S1]", ["S1"], False, NO_EVIDENCE),
-        ("不知道", [], True, NO_EVIDENCE),
+        ("缺少题目中的进程到达时间，请补充。", [], True, "缺少题目中的进程到达时间，请补充。"),
     ]:
         llm = SimpleNamespace(
             generate=lambda *args: GenerationResult(
@@ -73,7 +73,7 @@ def test_qa_citation_and_insufficiency_guard():
         )
         response = QAService(settings, retrieval, llm).answer(request)
         assert response.answer == expected
-        assert bool(response.sources) == (expected != NO_EVIDENCE)
+        assert bool(response.sources) == (expected == "使用队列 [S1]")
 
 
 def test_empty_course_refuses_without_llm(tmp_path):

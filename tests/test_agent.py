@@ -158,3 +158,21 @@ def test_native_tool_call_provider_contract():
         turn = planner.step([{"role": "user", "content": "A* 在哪里"}], [{"type": "function"}])
     assert turn.calls[0].function.name == "locate_source"
     assert requests[0]["tool_choice"] == "auto" and requests[0]["tools"]
+
+
+@pytest.mark.parametrize("corrected", [True, False])
+def test_final_citation_repair_is_bounded_and_still_verifies(exam_app, corrected):
+    app, client, course, _ = exam_app
+    app.state.agent.settings.study_mode = "api"
+    invalid = ModelAnswer(answer="候选题目 [S99]", citation_ids=["S99"], insufficient_evidence=False)
+    valid = ModelAnswer(answer="已找到候选题目 [S1]", citation_ids=["S1"], insufficient_evidence=False)
+    planner = ScriptedPlanner([
+        call("search_questions", {"number": "1", "limit": 1}),
+        AgentTurn(final=invalid),
+        AgentTurn(final=valid if corrected else invalid),
+    ])
+    app.state.agent.planner = planner
+    result = client.post("/api/agent", json={"course_id": course, "question": "查找第1题"}).json()
+    assert len(planner.messages) == 3
+    assert result["finish_reason"] == ("completed" if corrected else "invalid_citations")
+    assert "S99" not in result["answer"]

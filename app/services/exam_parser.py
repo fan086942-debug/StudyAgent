@@ -8,9 +8,13 @@ from app.schemas.document import TextBlock
 from app.schemas.exam import ExtractedQuestion
 
 NUMBER = re.compile(
-    r"^\s*(?:第\s*(\d{1,3})\s*题\s*[:：、.]?|(?:题\s*)?(\d{1,3})[.．、)）](?!\d))\s*"
+    r"^[ \t]*(?:第\s*(\d{1,3}(?:[.．]\d{1,3}){0,3})\s*题\s*[:：、.]?"
+    r"|(?:题\s*)?(\d{1,3})[.．、)）](?!\d)"
+    r"|(\d{1,3}(?:[.．]\d{1,3}){1,3})(?:[.．、)）](?!\d)|(?=\s)))\s*"
 )
 SECTION = re.compile(r"^[一二三四五六七八九十]+[、.．]\s*")
+CHAPTER = re.compile(r"^第\s*[一二三四五六七八九十百\d]+\s*[章节](?:\s|$)")
+PAGE_HEADER = re.compile(r"^\s*第\s*\d+\s*页\s*共\s*\d+\s*页\s*$")
 TYPES = {
     "选择": "choice",
     "判断": "true_false",
@@ -40,6 +44,14 @@ def build_exam_text(blocks: list[TextBlock]) -> ExamText:
     text, spans = "", []
     for block in blocks:
         cleaned = clean_text(block.text)
+        if block.location_type == "pdf_page":
+            # Remove only a recognizable page counter at a page margin, not question text.
+            lines = cleaned.splitlines()
+            if lines and PAGE_HEADER.fullmatch(lines[0]):
+                lines.pop(0)
+            if lines and PAGE_HEADER.fullmatch(lines[-1]):
+                lines.pop()
+            cleaned = "\n".join(lines)
         start = len(text)
         text += cleaned + "\n"
         spans.append((start, start + len(cleaned), block))
@@ -75,7 +87,8 @@ def rule_extract(text: str) -> list[ExtractedQuestion]:
         )
 
     for line in text.splitlines():
-        if SECTION.match(line) or re.match(r"^(参考答案|答案与解析)\s*[:：]?$", line):
+        if (SECTION.match(line) or CHAPTER.match(line) or line.strip() == "习题"
+                or re.match(r"^(参考答案|答案与解析)\s*[:：]?$", line)):
             finish()
             lines, number = [], None
             kind = question_type(line)
@@ -85,21 +98,32 @@ def rule_extract(text: str) -> list[ExtractedQuestion]:
         match = NUMBER.match(line)
         if match:
             finish()
-            number, lines = match[1] or match[2], [line]
+            number, lines = next(group for group in match.groups() if group), [line]
         elif number is not None:
             lines.append(line)
     finish()
     return result
 
 
+def quote_char(char: str) -> str:
+    # Width differences and invisible PDF layout characters are not semantic edits.
+    # Keep operators, digits, superscripts and punctuation otherwise distinct.
+    if char.isspace() or char in "\u00ad\u200b\ufeff":
+        return ""
+    if "\uff01" <= char <= "\uff5e":
+        return chr(ord(char) - 0xfee0)
+    return char
+
+
 def locate_quote(text: str, quote: str, start: int = 0) -> tuple[int, int]:
-    # 只容忍排版空白差异，题干和选项必须能在原文连续匹配，拒绝模型改写或编造。
+    # Exact matching after narrowly defined layout normalization; never fuzzy matching.
     chars, positions = [], []
     for index, char in enumerate(text):
-        if not char.isspace():
-            chars.append(char)
+        normalized = quote_char(char)
+        if normalized:
+            chars.append(normalized)
             positions.append(index)
-    needle = re.sub(r"\s+", "", quote)
+    needle = "".join(quote_char(char) for char in quote)
     offset = next((i for i, pos in enumerate(positions) if pos >= start), len(positions))
     match = "".join(chars).find(needle, offset)
     if not needle or match < 0:
@@ -111,6 +135,9 @@ def verify_number(number: str, text: str) -> None:
     # 题干中可能有年份、分值等数字，不能仅凭“数字出现在原文里”就认定它是题号。
     number = unicodedata.normalize("NFKC", number).strip()
     text = unicodedata.normalize("NFKC", text).lstrip()
+    detected = NUMBER.match(text)
+    if detected and next(group for group in detected.groups() if group) != number:
+        raise AppError("exam_invalid_number", "模型题号与原文开头不一致，请重试", 502)
     pattern = r"^(?:第\s*|题\s*|Question\s*|Q\s*|[\[(【])?" + re.escape(number)
     pattern += r"(?:\s*(?:题|[.、:)\]】])|\s+)"
     if not re.match(pattern, text, re.IGNORECASE):

@@ -1,8 +1,8 @@
 import logging
-import re
 import time
 
 from app.schemas.chat import ChatResponse, SearchRequest
+from app.services.answering import solve, valid_answer
 
 logger = logging.getLogger("studyagent")
 NO_EVIDENCE = "当前资料中未找到可靠来源。"
@@ -17,40 +17,31 @@ class QAService:
         retrieval = self.retriever.search(request)
         sources = retrieval.sources
         answer, insufficient, warning, usage, llm_ms = NO_EVIDENCE, True, None, None, 0.0
+        answer_basis = "unanswered"
         if sources and self.settings.study_mode == "demo":
             answer = "演示模式仅展示检索摘录，未调用 LLM，不能判断这些资料是否足以回答问题。\n\n"
             answer += "\n\n".join(f"[{s.citation_id}] {s.text}" for s in sources)
             warning = "当前使用字词哈希检索；切换 API 模式后才能生成语义问答。"
             # 演示摘录没有做证据充分性判断，不宣称问题已被回答。
             insufficient = True
-        elif sources:
+        elif self.settings.study_mode != "demo":
             llm_start = time.perf_counter()
             # 将筛选后的正文与引用编号交给模型，真实文件位置由后端的 Source 提供。
-            result = self.llm.generate(
-                request.question,
-                [{"id": source.citation_id, "text": source.text} for source in sources],
-            )
+            result = solve(self.llm, request.question, sources)
             llm_ms = (time.perf_counter() - llm_start) * 1000
             usage = result.usage
             content = result.content
             # 检查声明引用、正文引用与检索来源是否一致；此校验不判断内容是否被证据支持。
-            available = {source.citation_id for source in sources}
             claimed = set(content.citation_ids)
-            inline = set(re.findall(r"\[(S\d+)\]", content.answer))
-            bad_location = re.search(r"第\s*[\d一二三四五六七八九十百]+\s*[页章]", content.answer)
             if content.insufficient_evidence:
                 sources = []
-            elif (
-                not claimed
-                or not content.answer.strip()
-                or not claimed.issubset(available)
-                or not inline.issubset(claimed)
-                or bad_location
-            ):
+                answer = content.answer
+            elif not valid_answer(content, sources, allow_model=True):
                 warning = "模型输出包含无效引用或自行生成的位置，已拒绝展示，请重试。"
                 sources = []
             else:
                 answer, insufficient = content.answer, False
+                answer_basis = content.answer_basis
                 sources = [source for source in sources if source.citation_id in claimed]
         logger.info(
             "qa mode=%s sources=%s insufficient=%s retrieval_ms=%.1f llm_ms=%.1f",
@@ -62,6 +53,7 @@ class QAService:
         )
         return ChatResponse(
             answer=answer,
+            answer_basis=answer_basis,
             sources=sources,
             mode=self.settings.study_mode,
             insufficient_evidence=insufficient,

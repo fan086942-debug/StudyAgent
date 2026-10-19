@@ -1,0 +1,59 @@
+{
+  "verified_at": "2026-10-19T18:51:51.215081+08:00",
+  "real_api": true,
+  "provider": "DeepSeek",
+  "model": "deepseek-flash",
+  "python_suite": {
+    "passed": 228
+  },
+  "ruff": "passed",
+  "elapsed_seconds": 33.62,
+  "cases": {
+    "no_materials": {
+      "answer_basis": "model",
+      "insufficient_evidence": false,
+      "source_types": [],
+      "locations": []
+    },
+    "with_slides": {
+      "answer_basis": "materials",
+      "insufficient_evidence": false,
+      "source_types": [
+        "slides"
+      ],
+      "locations": [
+        {
+          "type": "slide",
+          "page": 2
+        }
+      ]
+    },
+    "original_pdf_without_textbook": {
+      "answer_basis": "model",
+      "insufficient_evidence": false,
+      "source_types": [
+        "exam"
+      ],
+      "locations": [
+        {
+          "type": "pdf_page",
+          "page": 4
+        }
+      ]
+    }
+  },
+  "original_pdf_question_count": 74,
+  "browser": {
+    "passed": true,
+    "login_required": false,
+    "offline_option": false,
+    "unconfigured_model_rejected": true,
+    "model_label": true,
+    "actual_slide_reference": true,
+    "original_question_location": true,
+    "horizontal_overflow": false,
+    "javascript_errors": [],
+    "rendering_uses_saved_real_api_answers": true
+  },
+  "privacy": "Question text, credentials, local data and full model answers are excluded from this summary."
+}

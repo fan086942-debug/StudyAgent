@@ -16,6 +16,22 @@ from tests.test_agent import ScriptedPlanner
 from tests.test_exams import exam_bytes
 
 
+@pytest.mark.parametrize("question", [
+    "解释第2.10题，给出题干、参考答案和教材依据。",
+    "请给出教材中这道题的参考答案",
+    "指出题目中与教材矛盾的地方",
+])
+def test_existing_question_answer_is_not_new_exam_generation(question):
+    assert generation_requested(question) is False
+    assert study_intent(question) is None
+    assert topic_generation_intent(question) is None
+
+
+def test_explicit_question_count_still_requests_generation():
+    assert generation_requested("根据教材给出两道题") is True
+    assert study_intent("根据教材给出两道题")["question_count"] == 2
+
+
 @pytest.mark.parametrize(
     "question,count,topic",
     [

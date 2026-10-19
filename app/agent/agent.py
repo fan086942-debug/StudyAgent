@@ -141,9 +141,10 @@ class StudyAgent:
         messages.append({"role": "user", "content": request.question})
         trace, usage, cache, call_ids = [], {}, {}, set()
         warning, reason, final = None, "step_limit", None
+        citation_repaired = False
         # 一轮由“模型选择 → 校验参数 → 执行工具 → 回传观察”组成。
         # 除模型轮数外，也限制总工具调用数，多工具响应不能绕过执行上限。
-        for _ in range(self.settings.agent_max_steps + 1):
+        for _ in range(self.settings.agent_max_steps + 2):
             checkpoint({"type": "status", "stage": "planning", "message": "正在分析问题，选择下一步工具…"})
             if len(json.dumps(messages, ensure_ascii=False)) > self.settings.agent_context_chars:
                 reason, warning = "context_limit", "执行上下文达到上限，请缩小资料范围或拆分问题。"
@@ -157,6 +158,23 @@ class StudyAgent:
             checkpoint()
             self._usage(usage, turn.usage)
             if not turn.calls:
+                if (turn.final is not None and not turn.final.insufficient_evidence
+                        and context.sources and not citation_repaired
+                        and not valid_answer(turn.final, list(context.sources.values()))):
+                    citation_repaired = True
+                    messages.extend([
+                        {"role": "assistant", "content": turn.final.model_dump_json()},
+                        {"role": "user", "content":
+                         "最终回答未通过引用校验。只修正这份回答，不调用工具、不生成新题。"
+                         "正文用 [S数字] 引用，citation_ids 必须与正文引用集合完全相等，"
+                         "只允许引用这些已检索来源：" + ", ".join(
+                             source.citation_id for source in context.sources.values()
+                         ) + "。删除自行写出的页码和章节位置，由来源卡片展示；"
+                         "保留原题号。缺少事实依据时将 insufficient_evidence 设为 true。"
+                         "返回完整 JSON 对象。"},
+                    ])
+                    logger.warning("agent run=%s final_citations=repair_once", run_id)
+                    continue
                 final, reason = turn.final, "completed"
                 break
             if len(trace) + len(turn.calls) > self.settings.agent_max_steps:
@@ -188,6 +206,7 @@ class StudyAgent:
                 before_sources, before_questions = dict(context.sources), dict(context.questions)
                 before_artifacts, before_plans = dict(context.artifacts), dict(context.plans)
                 before_learning, before_answer = dict(context.learning), context.learning_answer
+                before_solution, before_solution_sources = context.solution, list(context.solution_sources)
                 try:
                     if key in cache:
                         output, state = cache[key], "cached"
@@ -207,6 +226,7 @@ class StudyAgent:
                     context.sources, context.questions = before_sources, before_questions
                     context.artifacts, context.plans = before_artifacts, before_plans
                     context.learning, context.learning_answer = before_learning, before_answer
+                    context.solution, context.solution_sources = before_solution, before_solution_sources
                     # 错误作为 observation 交回模型，让下一轮有机会修正参数或换工具。
                     state, output = "error", {"error": {"code": exc.code, "message": exc.message}}
                     observation = output
@@ -215,6 +235,7 @@ class StudyAgent:
                     context.sources, context.questions = before_sources, before_questions
                     context.artifacts, context.plans = before_artifacts, before_plans
                     context.learning, context.learning_answer = before_learning, before_answer
+                    context.solution, context.solution_sources = before_solution, before_solution_sources
                     logger.error(
                         "agent run=%s tool=%s error_type=%s", run_id, name, type(exc).__name__
                     )
@@ -256,6 +277,10 @@ class StudyAgent:
                     state,
                     observation,
                 )
+            if context.solution is not None:
+                final = context.solution
+                reason = "insufficient_evidence" if final.insufficient_evidence else "completed"
+                break
         checkpoint({"type": "status", "stage": "validating", "message": "正在校验回答与资料来源…"})
         return self._finish(context, trace, usage, final, reason, warning, start)
 
@@ -271,7 +296,13 @@ class StudyAgent:
             "当前资料范围没有检索到足够依据，请确认资料已完成处理，或明确需要学习的内容。",
             True,
         )
-        if context.learning_answer:
+        answer_basis = "unanswered"
+        if context.solution is not None:
+            answer = context.solution.answer
+            insufficient = context.solution.insufficient_evidence
+            answer_basis = context.solution.answer_basis
+            sources = context.solution_sources
+        elif context.learning_answer:
             answer, insufficient = context.learning_answer, False
         elif context.artifacts:
             answer = "已生成并保存：" + "、".join(a.title for a in context.artifacts.values())
@@ -302,6 +333,7 @@ class StudyAgent:
             warning = warning or "规则规划用于离线演示；真实任务选择与推理需要 API 模式。"
         elif final is not None and valid_answer(final, sources):
             answer, insufficient = final.answer, False
+            answer_basis = final.answer_basis
             sources = [s for s in sources if s.citation_id in final.citation_ids]
         elif final is not None and not final.insufficient_evidence:
             warning = "模型最终回答缺少有效引用或包含自行生成的位置，已拒绝展示。"
@@ -326,6 +358,7 @@ class StudyAgent:
             plans=list(context.plans.values()),
             artifacts=list(context.artifacts.values()),
             answer=answer,
+            answer_basis=answer_basis,
             sources=sources,
             questions=questions,
             trace=trace,
