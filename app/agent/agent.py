@@ -4,6 +4,7 @@ import time
 from uuid import uuid4
 
 from app.agent.intents import (
+    chapter_question_number,
     relation_intent,
     solution_requested,
     study_intent,
@@ -155,7 +156,20 @@ class StudyAgent:
                 reason, warning = "context_limit", "执行上下文达到上限，请缩小资料范围或拆分问题。"
                 break
             try:
-                turn = self.planner.step(messages, self.registry.schemas())
+                if (not trace and self.settings.study_mode != "demo"
+                        and chapter_question_number(request.question)
+                        and solution_requested(request.question)):
+                    # Resolve explicit chapter/exercise references before any model
+                    # can refuse for missing text or guess a different question ID.
+                    turn = AgentTurn(calls=[ToolCall(
+                        id="resolve-" + uuid4().hex,
+                        function=FunctionCall(
+                            name="answer_question",
+                            arguments=json.dumps({"query": request.question}, ensure_ascii=False),
+                        ),
+                    )])
+                else:
+                    turn = self.planner.step(messages, self.registry.schemas())
             except AppError as exc:
                 self._usage(usage, exc.usage)
                 reason, warning = "provider_error", exc.message

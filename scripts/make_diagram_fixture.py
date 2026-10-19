@@ -8,7 +8,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 
-def make_diagram_pdf(path):
+def make_diagram_pdf(path, number="1.1"):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", (1050, 520), "white")
@@ -38,7 +38,7 @@ def make_diagram_pdf(path):
     image.close()
     pdf = canvas.Canvas(str(path), pagesize=(612, 792))
     pdf.setFont("Helvetica", 12)
-    pdf.drawString(30, 748, "1.1 Follow the directed arrows in the diagram.")
+    pdf.drawString(30, 748, f"{number} Follow the directed arrows in the diagram.")
     pdf.drawString(30, 728, "What is the ONLY directed path from P to R? List the nodes in order.")
     pdf.drawImage(ImageReader(stream), 20, 365, width=572, height=283)
     pdf.setFont("Helvetica", 10)

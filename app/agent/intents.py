@@ -11,10 +11,49 @@ def solution_requested(question):
         return False
     return bool(re.search(
         r"解答|回答|答题|做题|帮我做|解释|解析|分析|求解|计算|证明|推导|为什么|为何|如何|怎么|"
-        r"是什么|什么是|讲解|说明|答案|第\s*[\d一二三四五六七八九十百.]+\s*题|[?？]", question,
+        r"是什么|什么是|讲解|说明|答案|第\s*[\d一二三四五六七八九十百.]+\s*(?:个|道)?题|[?？]", question,
     ))
 
 NUMBER = r"(?:\d+|[零一二两三四五六七八九十百]+)"
+
+
+def _ordinal(value):
+    if value.isdigit():
+        return int(value)
+    digits = dict(zip("零一二两三四五六七八九", (0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9)))
+    total, digit = 0, 0
+    for char in value:
+        if char in digits:
+            digit = digits[char]
+        else:
+            total += (digit or 1) * (10 if char == "十" else 100)
+            digit = 0
+    return total + digit
+
+
+def chapter_question_number(question):
+    """A lookup candidate, never a substitute for finding the actual exercise."""
+    match = re.search(
+        rf"第\s*({NUMBER})\s*章\s*(?:的\s*)?(?:习题\s*)?第\s*({NUMBER})\s*(?:个|道)?\s*题(?:目)?",
+        question,
+    )
+    if match:
+        return f"{_ordinal(match[1])}.{_ordinal(match[2])}"
+    return None
+
+
+def referenced_question_number(question):
+    chapter = chapter_question_number(question)
+    if chapter:
+        return chapter
+    match = re.search(
+        rf"第\s*({NUMBER}(?:\s*[.．]\s*\d+)*)\s*(?:个|道)?\s*题(?:目)?", question,
+    )
+    if match:
+        return ".".join(str(_ordinal(part.strip())) for part in re.split(r"[.．]", match[1]))
+    return None
+
+
 COUNT = rf"({NUMBER})\s*(?:道(?:题目?)?|题目?)"
 NEGATED_GENERATION = (
     r"(?:不要|不用|不需要|无需|不必|别).{0,12}(?:出|生成|制作|准备).{0,20}(?:题|卷|复习)"

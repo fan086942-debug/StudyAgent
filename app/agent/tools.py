@@ -2,12 +2,13 @@ import re
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
-from app.agent.intents import generation_requested, study_intent
+from app.agent.intents import generation_requested, referenced_question_number, study_intent
 from app.core.errors import AppError
 from app.llm.base import ModelAnswer
-from app.models import Document
+from app.models import Document, DocumentChunk
+from app.rag.sources import chunk_source
 from app.schemas.agent import KnowledgeArgs, QuestionArgs, ToolResult
 from app.schemas.chat import SearchRequest, Source
 from app.schemas.exam import QuestionSearch
@@ -147,6 +148,9 @@ class ToolRegistry:
         # 课程和资料范围来自用户请求，由服务端注入；模型无权自行扩大检索范围。
         request = context.request
         if name == "answer_question":
+            number = referenced_question_number(request.question)
+            if number and "." in number:
+                return self._answer_numbered_question(number, context)
             evidence = self._knowledge(args.query, context)
             # Preserve useful retrieval already performed by the planner.
             if not evidence:
@@ -286,15 +290,15 @@ class ToolRegistry:
             ids = list(session.scalars(statement))
         if not ids:
             return []
-        number = re.search(r"第\s*(\d+(?:[.．]\d+)*)\s*题", request.question)
+        number = referenced_question_number(request.question)
         if number and not locate:
             # An exact exercise number should not depend on semantic similarity,
             # including when a worksheet was uploaded as textbook rather than exam.
             literal = self.retriever.locate(SearchRequest(
-                course_id=request.course_id, document_ids=ids, question=number[1],
+                course_id=request.course_id, document_ids=ids, question=number,
             ))
             header = re.compile(
-                r"(?:^|\n)\s*(?:第\s*)?" + re.escape(number[1])
+                r"(?:^|\n)\s*(?:第\s*)?" + re.escape(number).replace(r"\.", r"[.．]")
                 + r"(?:\s*题)?(?:[.．、:：)）](?!\d)|\s)",
             )
             matched = [source for source in literal.sources if header.search(source.text)]
@@ -305,6 +309,83 @@ class ToolRegistry:
             SearchRequest(course_id=request.course_id, document_ids=ids, question=query)
         )
         return context.cite(result.sources)
+
+    def _answer_numbered_question(self, number, context):
+        request = context.request
+        questions = self.exams.search(
+            request.course_id, request.document_ids, QuestionSearch(number=number, limit=30),
+        )
+        if len(questions) == 1:
+            question = questions[0]
+            context.questions[question.id] = question
+            sources = context.cite([self._question_source(question, request.course_id)])
+            return self._analyze(question, sources, context)
+        if len(questions) > 1:
+            return self._unresolved_reference(
+                f"当前范围内有多道题号为 {number} 的原题，请勾选对应文件后再解答。", context,
+            )
+        # Material uploads have no Question rows. Locate the literal exercise
+        # header before solving; unrelated semantic hits cannot supply a stem.
+        header = re.compile(
+            r"(?:^|\n)\s*(?:第\s*)?" + re.escape(number).replace(r"\.", r"[.．]")
+            + r"(?:\s*题)?(?:[.．、:：)）](?!\d)|\s)",
+        )
+        with self.sessions() as session:
+            statement = (
+                select(DocumentChunk, Document)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(
+                    Document.course_id == request.course_id,
+                    Document.document_type != "exam", Document.status == "ready",
+                    or_(
+                        DocumentChunk.text.contains(number, autoescape=True),
+                        DocumentChunk.text.contains(number.replace(".", "．"), autoescape=True),
+                    ),
+                )
+                .order_by(DocumentChunk.document_id, DocumentChunk.ordinal)
+            )
+            if request.document_ids is not None:
+                statement = statement.where(Document.id.in_(request.document_ids))
+            evidence, documents = [], set()
+            for chunk, doc in session.execute(statement):
+                if not header.search(chunk.text):
+                    continue
+                documents.add(doc.id)
+                if len(documents) > 1:
+                    break
+                if len(evidence) < self.settings.retrieval_top_k:
+                    evidence.append(chunk_source(chunk, doc, ""))
+        if len(documents) > 1:
+            return self._unresolved_reference(
+                f"多份资料中都找到了题号 {number}，请勾选要解答的文件。", context,
+            )
+        if evidence:
+            evidence = context.cite(evidence)
+            return self._solve(
+                f"用户请求：{request.question}\n已在所选资料中定位题号 {number}。"
+                "请读取检索原文和原图中该题的完整条件并解答，不要要求用户重新输入已有原题。",
+                evidence, [], context,
+            )
+        with self.sessions() as session:
+            statement = select(Document.status).where(Document.course_id == request.course_id)
+            if request.document_ids is not None:
+                statement = statement.where(Document.id.in_(request.document_ids))
+            statuses = list(session.scalars(statement))
+        if not statuses:
+            message = "当前课程里没有可读取的资料，请先上传题目所在文件。"
+        elif any(status not in {"ready", "failed"} for status in statuses):
+            message = "题目所在资料仍在处理中，请完成后再试。"
+        else:
+            message = f"已查找当前资料，但未找到题号 {number} 的原题。请确认文件范围和原文题号，或提供题目截图。"
+        return self._unresolved_reference(message, context)
+
+    @staticmethod
+    def _unresolved_reference(message, context):
+        context.solution = ModelAnswer(
+            answer=message, insufficient_evidence=True, answer_basis="unanswered",
+        )
+        context.solution_sources = []
+        return ToolResult(answer=message, insufficient_evidence=True, answer_basis="unanswered")
 
     @staticmethod
     def _question_source(question, course_id) -> Source:
