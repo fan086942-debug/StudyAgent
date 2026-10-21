@@ -1,4 +1,4 @@
-from app.rag.chunker import chunk_blocks
+from app.rag.chunker import chunk_blocks, clean_text
 from app.schemas.document import TextBlock
 
 
@@ -22,3 +22,11 @@ def test_empty_short_and_page_isolation():
     chunks = chunk_blocks(blocks, 100, 20)
     assert len(chunks) == 2
     assert [chunk.page for chunk in chunks] == [2, 3]
+
+
+def test_repeated_watermark_is_reduced_without_removing_body_or_formulas():
+    text = "正文与原始公式 A+A。\n" + "课程平台水印\n" * 40 + "后续正文\n重复要点\n重复要点"
+    cleaned = clean_text(text)
+    assert cleaned.count("课程平台水印") == 1
+    assert "正文与原始公式 A+A。" in cleaned and "后续正文" in cleaned
+    assert cleaned.count("重复要点") == 2

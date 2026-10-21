@@ -58,11 +58,13 @@ class GenerationService:
         sources, by_chunk, topic_ids = [], {}, {}
         quota = self.settings.context_char_budget // len(request.topics)
         for topic in request.topics:
-            found = self.retriever.search(
+            # Short topic queries can rank an isolated heading above its explanation.
+            # Exact occurrences retain relevant body chunks despite the hash-vector threshold.
+            found = self.retriever.topic(
                 SearchRequest(course_id=request.course_id, document_ids=ids, question=topic)
             ).sources
             remaining, accepted = quota, []
-            for source in found[:8]:
+            for source in found:
                 if source.chunk_id in by_chunk:
                     accepted.append(by_chunk[source.chunk_id].citation_id)
                     continue
@@ -99,6 +101,7 @@ class GenerationService:
                     "sources": [{"id": s.citation_id, "text": s.text} for s in sources],
                     "avoid_stems": list(avoid_stems),
                 },
+                validator=lambda result: self._validate(request, result, topic_ids),
             )
             warning = "模型生成的复习内容与参考答案需对照原文核查，题目难度为模型估计，非官方试卷。"
         try:
@@ -142,36 +145,32 @@ class GenerationService:
                 "generation_no_evidence", "当前资料不足以生成符合要求的内容，请补充资料", 409
             )
         items = content.sections if request.kind == "review" else content.questions
-        invalid = (
-            (
-                request.kind == "review"
-                and (len(content.sections) != len(request.topics) or content.questions)
-            )
-            or (
-                request.kind == "mock_exam"
-                and (len(content.questions) != request.question_count or content.sections)
-            )
-            or {item.topic for item in items} != set(request.topics)
-        )
+        problems = []
+        if request.kind == "review" and (len(content.sections) != len(request.topics) or content.questions):
+            problems.append("复习小节数与主题数不一致，或混入了题目")
+        if request.kind == "mock_exam" and (len(content.questions) != request.question_count or content.sections):
+            problems.append("题数不符，或混入了复习小节")
+        if {item.topic for item in items} != set(request.topics):
+            problems.append("主题名称未与请求逐字对应")
         for item in items:
             if not set(item.citation_ids).issubset(topic_ids.get(item.topic, [])):
-                invalid = True
+                problems.append("引用编号不属于该主题的可用来源")
             if isinstance(item, PracticeQuestion):
                 if item.type != request.question_type or item.difficulty != request.difficulty:
-                    invalid = True
+                    problems.append("题型或难度不符")
             # 引用和位置由服务端渲染；禁止正文夹带另一套来源编号或编造页码。
             text = str(item.model_dump(exclude={"citation_ids", "topic"}))
             for heading in allowed_headings:
                 text = text.replace(heading, "")
             if re.search(r"\[S\d+\]|第\s*[\d一二三四五六七八九十百]+\s*[页章]", text):
-                invalid = True
+                problems.append("正文包含自行标注的引用、页码或章节位置")
         stems = [re.sub(r"\s+", "", q.stem) for q in content.questions]
         if len(set(stems)) != len(stems):
-            invalid = True
-        if invalid:
+            problems.append("题干重复")
+        if problems:
             raise AppError(
                 "generation_invalid_content",
-                "生成结果未通过主题、题数、题型或来源校验，未保存；请减少要求或重试",
+                "生成结果未通过校验，未保存：" + "；".join(dict.fromkeys(problems)),
                 502,
             )
 

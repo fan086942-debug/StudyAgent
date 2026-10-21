@@ -1,4 +1,5 @@
 import re
+from collections import Counter
 
 from app.schemas.document import TextBlock
 
@@ -6,6 +7,19 @@ from app.schemas.document import TextBlock
 def clean_text(text: str) -> str:
     # 清除解析噪声并统一空白，同时保留换行，供后续选择切分边界。
     text = text.replace("\x00", "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.splitlines()
+    repeated = {line.strip() for line, count in Counter(line.strip() for line in lines).items()
+                if len(line) >= 4 and count >= 5}
+    seen = set()
+    kept = []
+    for line in lines:
+        key = line.strip()
+        if key in repeated:
+            if key in seen:
+                continue
+            seen.add(key)
+        kept.append(line)
+    text = "\n".join(kept)
     return re.sub(r"\n{3,}", "\n\n", re.sub(r"[^\S\n]+", " ", text)).strip()
 
 

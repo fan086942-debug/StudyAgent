@@ -178,7 +178,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok",
             "mode": app.state.settings.study_mode,
             "version": "0.4.0",
-            "build": "20261019-chapter-question",
+            "build": "20261021-unified-material-workbench",
             "commit": os.environ.get("RENDER_GIT_COMMIT", "local"),
             "max_upload_mb": settings.max_upload_mb,
             "ocr_enabled": settings.ocr_enabled,

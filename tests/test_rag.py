@@ -54,7 +54,7 @@ def test_qa_citation_and_insufficiency_guard():
         file_url="/file",
     )
     retrieval = SimpleNamespace(
-        search=lambda request: SearchResponse(sources=[source], retrieval_ms=1)
+        answer=lambda request: SearchResponse(sources=[source], retrieval_ms=1)
     )
     request = SearchRequest(course_id="course", question="BFS?")
     settings = SimpleNamespace(study_mode="api")

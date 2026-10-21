@@ -5,6 +5,8 @@ from sqlalchemy import func, select
 
 from app.core.errors import AppError
 from app.models import Course, Document, DocumentChunk
+from app.rag.embedding import DemoEmbedding
+from app.rag.lexical import keyword_ranking, topic_section
 from app.rag.sources import chunk_source
 from app.schemas.chat import SearchRequest, SearchResponse
 
@@ -58,6 +60,42 @@ class Retriever:
                 if len(sources) == self.settings.retrieval_top_k:
                     break
         return SearchResponse(sources=sources, retrieval_ms=(time.perf_counter() - start) * 1000)
+
+    def keywords(self, request, *, section=False):
+        start = time.perf_counter()
+        with self.sessions() as session:
+            ready = self._ready(session, request)
+            rows = list(session.execute(
+                select(DocumentChunk, Document)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(DocumentChunk.document_id.in_(ready))
+                .order_by(DocumentChunk.document_id, DocumentChunk.ordinal)
+            )) if ready else []
+            selected = topic_section(rows, request.question) if section else []
+            limit = self.settings.retrieval_candidates if selected else self.settings.retrieval_top_k
+            if selected and len(selected) > limit:
+                selected = [selected[round(i * (len(selected)-1) / (limit-1))] for i in range(limit)] if limit > 1 else selected[:1]
+            selected = selected or keyword_ranking(rows, request.question)[:limit]
+            sources, budget = [], self.settings.context_char_budget
+            for chunk, doc in selected:
+                if budget < 100:
+                    break
+                text = chunk.text[:budget]
+                sources.append(chunk_source(chunk, doc, f"S{len(sources)+1}", text=text))
+                budget -= len(text)
+        return SearchResponse(sources=sources, retrieval_ms=(time.perf_counter()-start)*1000)
+
+    def topic(self, request):
+        found = self.keywords(request, section=True)
+        return found if found.sources else self.locate(request)
+
+    def answer(self, request):
+        if isinstance(self.embeddings, DemoEmbedding):
+            found = self.keywords(request)
+            if found.sources:
+                return found
+        found = self.search(request)
+        return found if found.sources else self.keywords(request)
 
     def _ready(self, session, request):
         if session.get(Course, request.course_id) is None:

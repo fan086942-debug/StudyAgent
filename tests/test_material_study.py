@@ -231,7 +231,7 @@ def test_failed_chapter_generation_saves_no_partial_artifact(study_app):
         data = json.loads(json.loads(request.content)["messages"][1]["content"])
         calls.append(data)
         content = model_pack_content(data, len(calls))
-        if len(calls) == 2:
+        if len(calls) in {2, 3}:
             content["sections"][0]["citation_ids"] = ["S999999"]
         return httpx.Response(
             200, json={"choices": [{"message": {"content": json.dumps(content)}}]}
@@ -247,6 +247,7 @@ def test_failed_chapter_generation_saves_no_partial_artifact(study_app):
         )
     with app.state.sessions() as session:
         assert list(session.scalars(select(StudyArtifact))) == []
+    assert len(calls) == 3  # One correction attempt, then stop without saving invalid sources.
 
 
 @pytest.mark.parametrize(

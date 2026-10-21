@@ -82,7 +82,7 @@ class StudyCheckpoint:
             except (OSError, ValueError, KeyError, AppError):
                 pass
         try:
-            content, used = self.service.provider.generate(task, data)
+            content, used = self.service.provider.generate(task, data, validator=validator)
             merge_usage(self.usage, used)
         except AppError as exc:
             merge_usage(self.usage, exc.usage)

@@ -101,6 +101,26 @@ def test_generation_repairs_schema_and_keeps_external_citations_validation():
     assert content.sections[0].citation_ids == ["S1"] and usage["total_tokens"] == 20
 
 
+def test_existing_index_noise_is_cleaned_only_in_model_input():
+    original = {"topics": {"主题": ["S1"]}, "sources": [
+        {"id": "S1", "text": "已有资料正文。\n" + "旧资料水印\n" * 30}
+    ]}
+    seen = []
+
+    def handler(request):
+        data = json.loads(json.loads(request.content)["messages"][1]["content"])
+        seen.append(data)
+        return completion(json.dumps(dict(title="总结", sections=[dict(
+            topic="主题", summary="已有资料正文。", key_points=["正文要点。"], citation_ids=["S1"]
+        )])))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        GenerationProvider(Settings(_env_file=None), http).generate(
+            StudyGenerationTask(kind="review", topics=["主题"]), original)
+    assert seen[0]["evidence"]["sources"][0]["text"].count("旧资料水印") == 1
+    assert original["sources"][0]["text"].count("旧资料水印") == 30
+
+
 def test_failed_study_resumes_valid_chapters_and_records_actual_usage(exam_app):
     from tests.test_material_study import study_book_bytes
 

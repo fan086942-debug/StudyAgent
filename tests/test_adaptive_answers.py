@@ -120,7 +120,7 @@ def test_referenced_solution_keeps_actual_slide_only(exam_app, tmp_path):
 ])
 def test_model_only_answer_cannot_fabricate_references(bad):
     provider = AnswerLLM(bad)
-    retrieval = SimpleNamespace(search=lambda _: SearchResponse(sources=[], retrieval_ms=0))
+    retrieval = SimpleNamespace(answer=lambda _: SearchResponse(sources=[], retrieval_ms=0))
     response = QAService(SimpleNamespace(study_mode="api"), retrieval, provider).answer(
         SearchRequest(course_id="c", question="A*?")
     )
@@ -150,7 +150,7 @@ def test_chat_no_materials_calls_solver_and_provider_prompt():
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         llm = CompatibleLLM(Settings(_env_file=None), client)
-        retrieval = SimpleNamespace(search=lambda _: SearchResponse(sources=[], retrieval_ms=0))
+        retrieval = SimpleNamespace(answer=lambda _: SearchResponse(sources=[], retrieval_ms=0))
         response = QAService(SimpleNamespace(study_mode="api"), retrieval, llm).answer(
             SearchRequest(course_id="c", question="A*?")
         )

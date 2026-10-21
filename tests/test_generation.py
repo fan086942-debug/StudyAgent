@@ -42,6 +42,38 @@ def body(course, **kwargs):
     return {"course_id": course, "kind": "review", "topics": ["A*"], **kwargs}
 
 
+def test_topic_generation_includes_body_beyond_isolated_heading(generation_app):
+    from io import BytesIO
+
+    from docx import Document as WordDocument
+
+    from app.schemas.generation import GenerationRequest
+
+    app, client, course, _, _ = generation_app
+    doc = WordDocument()
+    doc.add_heading("第1章 层次聚类", level=1)
+    explanation = "凝聚层次聚类从单点簇开始，合并距离最近的两个簇。" + "单链接取跨簇点对距离的最小值。" * 20
+    doc.add_paragraph(explanation)
+    buffer = BytesIO()
+    doc.save(buffer)
+    uploaded = client.post(
+        f"/api/courses/{course}/documents",
+        files={"file": ("有标题和正文的教材.docx", buffer.getvalue())},
+        data={"document_type": "textbook"},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    document = uploaded.json()["id"]
+    app.state.retriever.settings.min_similarity = 0.99
+    request = GenerationRequest(
+        course_id=course, document_ids=[document], kind="mock_exam",
+        topics=["层次聚类"], question_count=2,
+    )
+    sources, topic_ids = app.state.generation._evidence(request)
+    assert any("单链接取跨簇点对距离的最小值" in source.text for source in sources)
+    assert all(source.document_id == document for source in sources)
+    assert topic_ids["层次聚类"] == [source.citation_id for source in sources]
+
+
 def test_demo_review_history_scope_and_download(generation_app):
     app, client, course, material, exam = generation_app
     response = client.post("/api/generate", json=body(course, topics=[" A* ", "BFS", "A*"]))

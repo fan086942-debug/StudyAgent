@@ -448,7 +448,7 @@ async function loadArtifacts(append = false) {
   }
   artifactOffset = offset + records.length;
   $("more-artifacts").hidden = records.length < 10;
-  if (!artifactOffset) $("artifact-history").append(element("p", "还没有生成记录。填写知识主题即可开始。", "empty"));
+  if (!artifactOffset) $("artifact-history").append(element("p", "还没有生成记录。在工作台对话中总结资料或生成练习即可开始。", "empty"));
 }
 let previewEpoch = 0;
 async function openArtifact(id) {
@@ -456,10 +456,20 @@ async function openArtifact(id) {
   const epoch = ++previewEpoch;
   const artifact = await api(`/api/courses/${courseId}/artifacts/${id}`);
   if (courseId !== currentCourse || epoch !== previewEpoch) return;
-  showView("generation", false);
+  showView("study", false);
   renderArtifact(artifact);
-  $("artifact-preview").scrollIntoView({behavior: "smooth", block: "start"});
+  $("artifact-preview").scrollIntoView({behavior: motion(), block: "start"});
 }
+function openGenerationSettings() {
+  $("generation-settings").open = true;
+  $("study-generation").scrollIntoView({behavior: motion(), block: "start"});
+  $("generation-kind").focus({preventScroll: true});
+}
+$("open-generation-settings").addEventListener("click", openGenerationSettings);
+$("generation-settings").addEventListener("toggle", () => {
+  $("open-generation-settings").setAttribute("aria-expanded", String($("generation-settings").open));
+});
+
 function renderArtifact(artifact) {
   $("artifact-title").textContent = artifact.title;
   $("artifact-warning").textContent = artifact.warning;
@@ -518,6 +528,7 @@ function renderArtifact(artifact) {
     $("artifact-sources").append(sourceCard(source));
   }
   $("artifact-preview").hidden = false;
+  $("artifact-preview").scrollIntoView({behavior: motion(), block: "start"});
 }
 const studyPackOption = element("option", "整份资料学习包 · 分章重点与复习卷"); studyPackOption.value = "study_pack"; $("generation-kind").append(studyPackOption);
 const summaryOption = element("option", "整份资料 · 提取与总结知识点"); summaryOption.value = "material_summary"; $("generation-kind").append(summaryOption);
@@ -565,7 +576,7 @@ $("more-artifacts").addEventListener("click", () => loadArtifacts(true).catch(er
 
 async function summarizeMaterial(doc, button) {
   const courseId = currentCourse, epoch = scopeEpoch;
-  button.disabled = true; showView("generation");
+  button.disabled = true; showView("study", false);
   $("generation-status").textContent = `正在逐段读取 ${doc.name}，提取知识点并整理总结，请稍候…`;
   try {
     const artifact = await post("/api/study", {course_id: courseId, document_ids: [doc.id], include_questions: false});
@@ -657,7 +668,7 @@ knowledgeButton.addEventListener("click", async () => {
 
 
 // Views, learning records and interaction state. All user/model text uses textContent.
-const viewNames = {study: "学习工作台", generation: "复习与生成", exams: "历史题库", learning: "错题与计划", history: "对话记录"};
+const viewNames = {study: "学习工作台", exams: "历史题库", learning: "错题与计划", history: "对话记录"};
 let activeView = "study";
 let scopeEpoch = 0;
 let learningEpoch = 0;
@@ -672,6 +683,8 @@ let askEpoch = 0;
 const motion = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth";
 
 function showView(view, scroll = true) {
+  const legacyGeneration = view === "generation";
+  if (legacyGeneration) view = "study";
   if (!viewNames[view]) return;
   const changed = activeView !== view;
   activeView = view;
@@ -689,7 +702,8 @@ function showView(view, scroll = true) {
     panel.animate([{opacity: 0, transform: "translateY(14px)"}, {opacity: 1, transform: "translateY(0)"}], {duration: 320, easing: "cubic-bezier(.2,.75,.2,1)"});
   }
   closeSidebar();
-  if (scroll) window.scrollTo({top: 0, behavior: motion()});
+  if (legacyGeneration) openGenerationSettings();
+  else if (scroll) window.scrollTo({top: 0, behavior: motion()});
   if (view === "learning") loadLearning().catch(error => status(error.message, true));
   if (view === "history") loadHistory().catch(error => status(error.message, true));
 }

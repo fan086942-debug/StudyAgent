@@ -304,7 +304,7 @@ class ToolRegistry:
             matched = [source for source in literal.sources if header.search(source.text)]
             if matched:
                 return context.cite(matched)
-        retrieve = self.retriever.locate if locate else self.retriever.search
+        retrieve = self.retriever.locate if locate else self.retriever.answer
         result = retrieve(
             SearchRequest(course_id=request.course_id, document_ids=ids, question=query)
         )

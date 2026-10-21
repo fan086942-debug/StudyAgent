@@ -15,7 +15,7 @@ class QAService:
 
     def answer(self, request: SearchRequest) -> ChatResponse:
         start = time.perf_counter()
-        retrieval = self.retriever.search(request)
+        retrieval = self.retriever.answer(request)
         sources = retrieval.sources
         answer, insufficient, warning, usage, llm_ms = NO_EVIDENCE, True, None, None, 0.0
         answer_basis = "unanswered"
