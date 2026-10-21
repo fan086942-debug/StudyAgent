@@ -19,6 +19,7 @@ from app.api.connection import router as connection_router
 from app.api.courses import router as courses_router
 from app.api.documents import router as documents_router
 from app.api.exams import router as exams_router
+from app.api.exports import router as exports_router
 from app.api.generation import router as generation_router
 from app.api.learning import router as learning_router
 from app.api.material_learning import router as material_learning_router
@@ -69,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(exams_router)
     app.include_router(agent_router)
     app.include_router(generation_router)
+    app.include_router(exports_router)
     app.include_router(learning_router)
     app.include_router(material_learning_router)
     app.include_router(connection_router)
@@ -178,7 +180,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok",
             "mode": app.state.settings.study_mode,
             "version": "0.4.0",
-            "build": "20261021-unified-material-workbench",
+            "build": "20261021-local-word-exams",
             "commit": os.environ.get("RENDER_GIT_COMMIT", "local"),
             "max_upload_mb": settings.max_upload_mb,
             "ocr_enabled": settings.ocr_enabled,

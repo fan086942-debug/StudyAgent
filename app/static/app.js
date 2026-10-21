@@ -324,6 +324,10 @@ function renderResult(result) {
     }
     if (!result.sources.length) $("sources").append(element("p", result.answer_basis === "model" ? "本次由模型推理解答，未引用课程资料。上传相关教材或课件后可补充来源页码。" : "本次没有引用课程资料。", "empty"));
     window.studyReader?.update(result);
+    $("result-export").replaceChildren();
+    if (!result.insufficient_evidence && result.conversation_id) {
+      $("result-export").append(wordOffer(`/api/courses/${currentCourse}/conversations/${result.conversation_id}/word`));
+    }
     $("result").hidden = false; $("welcome").hidden = true; status("处理完成。");
 }
 
@@ -460,6 +464,39 @@ async function openArtifact(id) {
   renderArtifact(artifact);
   $("artifact-preview").scrollIntoView({behavior: motion(), block: "start"});
 }
+function wordOffer(url) {
+  const card = element("div", undefined, "export-offer");
+  card.setAttribute("role", "region");
+  card.setAttribute("aria-label", "保存本次学习内容");
+  card.append(element("strong", "需要整理本次内容，保存到本地吗？"), element("p", "选择题目与答案或知识重点，下载为 Word 文件。", "hint"));
+  const actions = element("div", undefined, "export-actions");
+  for (const [kind, label] of [["qa", "题目与答案 · Word"], ["knowledge", "知识重点 · Word"]]) {
+    const button = element("button", label, "secondary"); button.type = "button";
+    button.addEventListener("click", async () => {
+      const course = currentCourse, epoch = scopeEpoch, authEpoch = window.studyAuth?.epoch;
+      button.disabled = true;
+      try {
+        if (window.studyAuth && !window.studyAuth.require()) return;
+        const response = await fetch(url + "?kind=" + kind);
+        if (!response.ok) { const error = await response.json(); throw new Error(error.message || "Word 整理失败，请重试。"); }
+        const blob = await response.blob();
+        if (course !== currentCourse || epoch !== scopeEpoch || authEpoch !== window.studyAuth?.epoch) return;
+        const link = element("a"); const objectUrl = URL.createObjectURL(blob);
+        link.href = objectUrl;
+        link.download = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") || "")?.[1] || "学习整理.docx";
+        document.body.append(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        status("Word 已下载，请在浏览器的下载目录中查看。");
+      } catch (error) { if (course === currentCourse && epoch === scopeEpoch) status(error.message, true); }
+      finally { button.disabled = false; }
+    });
+    actions.append(button);
+  }
+  const dismiss = element("button", "暂不整理", "link-button"); dismiss.type = "button";
+  dismiss.addEventListener("click", () => { card.hidden = true; }); actions.append(dismiss);
+  card.append(actions); return card;
+}
+
 function openGenerationSettings() {
   $("generation-settings").open = true;
   $("study-generation").scrollIntoView({behavior: motion(), block: "start"});
@@ -474,6 +511,7 @@ function renderArtifact(artifact) {
   $("artifact-title").textContent = artifact.title;
   $("artifact-warning").textContent = artifact.warning;
   $("artifact-downloads").replaceChildren();
+  $("artifact-downloads").append(wordOffer(`/api/courses/${artifact.course_id}/artifacts/${artifact.id}/word`));
   const download = (label, answers) => {
     const link = element("a", label, "secondary");
     link.href = `/api/courses/${artifact.course_id}/artifacts/${artifact.id}/download?include_answers=${answers}`;
@@ -521,7 +559,7 @@ function renderArtifact(artifact) {
       $("relation-content").replaceChildren(...artifact.sources.filter(s => question.citation_ids.includes(s.citation_id)).map(sourceCard));
       if (!$("relation-dialog").open) $("relation-dialog").showModal();
     });
-    card.append(details, evidence, practiceWidget({reference_type: "artifact", reference_id: artifact.id, question_index: index}, artifact.course_id)); target.append(card);
+    card.append(details, evidence); target.append(card);
   }
   $("artifact-sources").replaceChildren();
   for (const source of artifact.sources) {
@@ -668,7 +706,7 @@ knowledgeButton.addEventListener("click", async () => {
 
 
 // Views, learning records and interaction state. All user/model text uses textContent.
-const viewNames = {study: "学习工作台", exams: "历史题库", learning: "错题与计划", history: "对话记录"};
+const viewNames = {study: "学习工作台", history: "对话记录"};
 let activeView = "study";
 let scopeEpoch = 0;
 let learningEpoch = 0;
@@ -684,7 +722,7 @@ const motion = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "i
 
 function showView(view, scroll = true) {
   const legacyGeneration = view === "generation";
-  if (legacyGeneration) view = "study";
+  if (legacyGeneration || view === "exams" || view === "learning") view = "study";
   if (!viewNames[view]) return;
   const changed = activeView !== view;
   activeView = view;
@@ -770,9 +808,7 @@ $("theme-toggle").addEventListener("click", () => {
 
 const commands = [
   ...Object.entries(viewNames).map(([view, label]) => ({label, action: () => showView(view)})),
-  {label: "查看学习进度", action: () => promptQuestion("查看我的学习进度")},
-  {label: "安排一周复习计划", action: () => promptQuestion("安排7天复习计划，每天30分钟")},
-  {label: "根据薄弱知识点生成复习资料", action: () => promptQuestion("生成薄弱知识点复习资料")},
+  {label: "设置复习内容和试卷题型", action: openGenerationSettings},
 ];
 function renderCommands() {
   const query = $("command-search").value.trim().toLocaleLowerCase();

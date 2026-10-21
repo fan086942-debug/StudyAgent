@@ -58,7 +58,7 @@ COUNT = rf"({NUMBER})\s*(?:道(?:题目?)?|题目?)"
 NEGATED_GENERATION = (
     r"(?:不要|不用|不需要|无需|不必|别).{0,12}(?:出|生成|制作|准备).{0,20}(?:题|卷|复习)"
 )
-EXAM_ACTION = rf"(?:生成|制作|准备).{{0,160}}(?:题|卷)|出\s*{NUMBER}\s*(?:道|题|套|份)|(?<![给列提指])出\s*(?:题|卷)|再(?:来|给我)?\s*{NUMBER}\s*(?:道|题)|模拟卷|模拟试卷"
+EXAM_ACTION = rf"(?:生成|制作|准备).{{0,160}}(?:题|卷)|出\s*{NUMBER}\s*(?:道|题|套|份|张)|(?<![给列提指])出\s*(?:题|卷)|再(?:来|给我)?\s*{NUMBER}\s*(?:道|题)|模拟卷|模拟试卷"
 
 
 def question_count(question):
@@ -105,7 +105,7 @@ def topic_generation_intent(question):
         topic = re.sub(COUNT, " ", topic)
         topic = re.sub(
             r"请帮我|请为我|帮我|为我|给我|请|一下|根据|基于|针对|关于|围绕|生成|整理|制作|准备|"
-            r"一份|一套|复习资料|复习提纲|模拟试卷|模拟卷|模拟题|练习题|试卷|卷子|"
+            r"一份|一套|一张|复习资料|复习提纲|模拟试卷|模拟卷|模拟题|练习题|试卷|卷子|"
             r"题目|选择题|简答题|计算题|基础难度|简单|基础|中等难度|适中|高难度|困难|进阶",
             " ",
             topic,
@@ -113,8 +113,20 @@ def topic_generation_intent(question):
         topic = re.sub(r"^(?:再来|再给我|再|继续)\s*", "", topic.strip())
         topic = re.sub(r"题$", "", topic.strip())
     topic = re.sub(r"\s+", " ", topic).strip(' 的，。？！,:：?!"“”')
+    whole_material = bool(re.search(r"每[章张]|各章|逐章|各个章节|每个章节|整本|全书|整份|全部资料", topic))
+    topic = re.sub(r"^(?:上传的|当前|这份|这个|这本)?(?:教材|资料|课件|笔记)(?:中|里|内)(?:的)?", "", topic)
+    topic = re.sub(r"^(?:这|该)(?=.{1,80}(?:这部分|部分|章节|一节))", "", topic)
+    topic = re.sub(r"(?:这|该|这一)?(?:部分|章节|一节)(?:的)?(?:知识点|内容|重点)?$", "", topic)
+    topic = re.sub(r"(?:的)?(?:知识点|相关知识|核心知识|知识内容)$", "", topic).strip(" 的，。 ")
+    topic = re.sub(r"(?:给我|给)$", "", topic).strip()
+    generic_material = bool(re.fullmatch(
+        r"(?:上传的?|已上传的?|当前的?|选中的?|这些|这[个本份]|我的|全部的?)*"
+        r"(?:pptx?|word|docx?|pdf|教材|资料|课件|笔记|书籍|书)(?:的?(?:重点|内容))?",
+        topic,
+        re.I,
+    ))
     # Deictic requests need a topic; an arbitrary filler must not become a retrieval query.
-    if topic in {
+    if whole_material or generic_material or topic in {
         "",
         "这个知识点",
         "这个",
@@ -124,6 +136,7 @@ def topic_generation_intent(question):
         "它",
         "这个主题",
         "同一主题",
+        "教材", "资料", "课件", "笔记", "这份资料", "这本书", "教材重点",
     }:
         topics = []
     else:
@@ -134,7 +147,8 @@ def topic_generation_intent(question):
         "generate_mock_exam" if exam else "generate_review",
         dict(
             topics=topics,
-            question_count=3 if question_count(question) is None else question_count(question),
+            question_count=(5 if re.search(r"试卷|卷子|一[张套份].*卷", question) else 3)
+            if question_count(question) is None else question_count(question),
             question_type="choice"
             if "选择题" in question
             else "calculation"
@@ -178,6 +192,9 @@ def study_intent(question):
     if not action or not (
         (material and (knowledge or exam)) or (chapters and knowledge) or "复习卷" in question
     ):
+        return None
+    named_topic = topic_generation_intent(question)
+    if named_topic and named_topic[1]["topics"]:
         return None
     hint = re.search(r"(?:对于|针对|根据|基于)\s*(.+?)\s*这[个本份]", question)
     name = hint[1].strip() if hint else None

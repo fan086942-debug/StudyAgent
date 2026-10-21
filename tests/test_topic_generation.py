@@ -32,6 +32,20 @@ def test_explicit_question_count_still_requests_generation():
     assert study_intent("根据教材给出两道题")["question_count"] == 2
 
 
+@pytest.mark.parametrize("question,topic", [
+    ("根据这进程这部分的知识点出一张试卷", "进程"),
+    ("根据教材中进程这部分知识点出一张试卷", "进程"),
+    ("根据缓存淘汰这部分的知识点出一套卷子", "缓存淘汰"),
+    ("基于这二叉树这一节的知识点出一份试卷", "二叉树"),
+])
+def test_natural_section_exam_request_has_concrete_topic(question, topic):
+    tool, args = topic_generation_intent(question)
+    assert tool == "generate_mock_exam"
+    assert args["topics"] == [topic]
+    assert args["question_count"] == 5
+    assert study_intent(question) is None
+
+
 @pytest.mark.parametrize(
     "question,count,topic",
     [

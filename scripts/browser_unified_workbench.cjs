@@ -22,7 +22,7 @@ const assert = require('node:assert/strict');
     assert.equal(uploaded.status(), 201);
     await page.goto(root);
     await page.waitForFunction(() => window.studyAuth?.ready);
-    assert.equal(await page.locator('.nav-item').count(), 4);
+    assert.equal(await page.locator('.nav-item').count(), 2);
     assert.equal(await page.locator('.nav-item[data-view="generation"]').count(), 0);
     assert.equal(await page.getByText('保留原文来源，学得更有把握', {exact: true}).count(), 0);
     assert.equal(await page.locator('#view-study #generation-form').count(), 1);
@@ -47,7 +47,7 @@ const assert = require('node:assert/strict');
     await page.locator('#generation-status').filter({hasText: '已生成并保存'}).waitFor();
     await page.locator('#generation-history > summary').click();
     assert.ok(await page.locator('#artifact-history .paper-row').count() >= 2);
-    await page.locator('.nav-item[data-view="exams"]').click();
+    await page.locator('.nav-item[data-view="history"]').click();
     assert.equal(await page.locator('#study-generation').isVisible(), false);
     await page.goto(root + '/#generation');
     await page.waitForFunction(() => location.hash === '#study');
@@ -65,7 +65,7 @@ const assert = require('node:assert/strict');
       await page.locator('#generation-settings > summary').click();
     }
     assert.deepEqual(errors, []);
-    const report = {navigation_items: 4, generation_inside_study: true, chat_generation: true,
+    const report = {navigation_items: 2, generation_inside_study: true, chat_generation: true,
       configurable_generation: true, saved_results: true, original_sources: true,
       old_generation_link_redirected: true, slogan_removed: true, mobile_widths: [390, 320], errors};
     fs.writeFileSync(output + '/report.json', JSON.stringify(report, null, 2));

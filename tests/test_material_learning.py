@@ -232,7 +232,10 @@ def test_english_untagged_material_question_relation(exam_app):
 
 
 def test_material_questions_are_generated_without_historical_paper():
-    for question in ("根据PPT出5道题", "根据Word出卷", "基于上传资料生成练习题"):
+    for question in (
+        "根据PPT出5道题", "根据Word出卷", "基于上传资料生成练习题",
+        "根据当前的PDF出一张试卷", "根据已上传的课件出两道题",
+    ):
         assert study_intent(question)["include_questions"] is True
 
 

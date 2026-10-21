@@ -71,5 +71,10 @@ body{background:radial-gradient(ellipse at 95% 0,var(--scene-wash),transparent 3
 .generation-settings .question-card { margin: 0; border: 0; box-shadow: none; }
 .generation-history > div, .generation-history > button { margin: 0 16px 16px; }
 .study-generation #artifact-preview { scroll-margin-top: 90px; }
+.export-offer { width: 100%; margin: 16px 0; padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--soft); }
+.export-offer > strong { font-size: 14px; line-height: 1.6; }
+.export-offer .hint { margin: 6px 0 12px; }
+.export-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.export-actions button { min-height: 44px; white-space: normal; }
 @media(max-width:700px){.prompt-chips{grid-template-columns:repeat(2,minmax(0,1fr))}.study-generation{margin-top:22px;padding-top:20px}.study-generation .list-heading{flex-wrap:wrap}.generation-settings .question-card{padding:16px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
