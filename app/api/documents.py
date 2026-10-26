@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, Request, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,9 +12,57 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import AppError
 from app.models import Course, Document
 from app.schemas.document import DocumentOut, DocumentType
+from app.services.pdf_preview import render_pdf_page
 
 router = APIRouter(prefix="/api", tags=["documents"])
 logger = logging.getLogger("studyagent")
+
+
+@router.get("/documents/{document_id}/pages/{page}")
+def preview_page(
+    document_id: str, page: int, request: Request,
+    width: Annotated[int, Query(ge=360, le=1200)] = 900,
+):
+    state = request.state.services
+    with state.sessions() as session:
+        doc = session.get(Document, document_id)
+        if doc is None or session.get(Course, doc.course_id) is None:
+            raise AppError("document_not_found", "资料不存在", 404)
+        if doc.status != "ready":
+            raise AppError("document_not_ready", "资料尚不可预览，请等待处理完成", 409)
+        if doc.file_type != "pdf":
+            raise AppError("preview_unsupported", "原页预览仅支持 PDF，请打开原文件", 415)
+        path = Path(doc.storage_path).resolve()
+        if not path.is_relative_to((state.settings.data_dir / "uploads").resolve()):
+            raise AppError("invalid_file_path", "资料存储路径异常", 500)
+        if not path.is_file():
+            raise AppError("file_missing", "原文件已丢失", 404)
+        # Three cache sizes bound storage even if callers request many widths.
+        size = min((360, 600, 900), key=lambda value: abs(value - width))
+        key = hashlib.sha256(f"{doc.sha256}:{page}:{size}:v1".encode()).hexdigest()
+        cache = (state.settings.data_dir / "preview-cache").resolve()
+        prefix = hashlib.sha256(document_id.encode()).hexdigest()
+        target = cache / f"{prefix}-{key}.jpg"
+        if page < 1:
+            raise AppError("page_not_found", "PDF 页码超出范围", 404)
+        headers = {"ETag": f'"{key}"', "Cache-Control": "private, max-age=0, must-revalidate"}
+        if not target.is_file():
+            try:
+                picture, _ = render_pdf_page(path, page, width=size)
+            except IndexError as exc:
+                raise AppError("page_not_found", "PDF 页码超出范围", 404) from exc
+            except Exception as exc:
+                raise AppError("preview_failed", "原页读取失败，请打开原文件核对", 422) from exc
+            cache.mkdir(parents=True, exist_ok=True)
+            temporary = cache / f"{key}-{uuid4().hex}.tmp"
+            try:
+                temporary.write_bytes(picture)
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+        if request.headers.get("if-none-match") == headers["ETag"]:
+            return Response(status_code=304, headers=headers)
+        return FileResponse(target, media_type="image/jpeg", headers=headers)
 
 
 def process_uploaded(state, identifier):

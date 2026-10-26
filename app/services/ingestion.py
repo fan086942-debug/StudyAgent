@@ -18,6 +18,7 @@ from app.models import (
 from app.rag.chunker import chunk_blocks
 from app.rag.parsers import parse_document
 from app.rag.parsers.ocr import delete_ocr_cache
+from app.services.pdf_preview import delete_preview_cache
 from app.services.study_checkpoint import purge_study_cache
 
 logger = logging.getLogger("studyagent")
@@ -224,6 +225,7 @@ class IngestionService:
                 self.vectors.delete_document_everywhere(document_id)
                 path.unlink(missing_ok=True)
                 delete_ocr_cache(self.settings.data_dir, document_id)
+                delete_preview_cache(self.settings.data_dir, document_id)
                 purge_study_cache(self.settings.data_dir, document.course_id, document_id)
                 paper_ids = select(ExamPaper.id).where(ExamPaper.document_id == document_id)
                 session.execute(delete(Question).where(Question.paper_id.in_(paper_ids)))

@@ -344,7 +344,13 @@ class LearningService:
         self.exams.validate_scope(course_id, None)
         with self.sessions() as session:
             return [
-                {"id": c.id, "question": c.question, "kind": c.kind, "created_at": c.created_at}
+                {
+                    "id": c.id, "question": c.question, "kind": c.kind,
+                    "created_at": c.created_at,
+                    "source_count": len(c.payload.get("sources", [])),
+                    "answer_excerpt": c.payload.get("answer", "")[:180],
+                    "answer_basis": c.payload.get("answer_basis", ""),
+                }
                 for c in session.scalars(
                     select(Conversation)
                     .where(Conversation.course_id == course_id)

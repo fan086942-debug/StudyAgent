@@ -20,3 +20,5 @@ dist/
 /adaptive-browser-verification.json
 /adaptive-model-ui.png
 /adaptive-slides-ui.png
+/.tmp-ui-desk/
+/.taste-skill/

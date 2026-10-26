@@ -1,17 +1,6 @@
 /* StudyAgent: content first, one quiet accent, consistent readable controls. */
-:root {
-  font-size: 16px;
-  --bg: #f6f8fa; --surface: #fff; --soft: #edf5f1; --ink: #1d2d28;
-  --muted: #53665d; --green: #24634b; --green-deep: #194b37;
-  --accent: #377b61; --border: #d6e1da; --gold: #805b26;
-  --shadow: 0 4px 16px #1d2d2806; --on-primary: #fff; --destructive: #a72c3c;
-}
-:root[data-theme=dark] {
-  --bg: #121a17; --surface: #1b2621; --soft: #26392f; --ink: #e9f2ed;
-  --muted: #b2c6ba; --green: #a9dcc0; --green-deep: #c2ead3;
-  --accent: #a9dcc0; --border: #45594d; --gold: #dfc095;
-  --shadow: none; --on-primary: #12251b; --destructive: #ffb3bb;
-}
+
+
 body { line-height: 1.6; }
 button { min-height: 44px; color: var(--on-primary); }
 button:hover { transform: none; box-shadow: none; }
@@ -30,7 +19,7 @@ label { font-size: 14px; }
 .badge { min-height: 44px; font-size: 13px; padding: 8px 12px; border-radius: 8px; }
 .command-trigger { font-size: 13px; }
 .app-shell { grid-template-columns: 272px minmax(0,1fr); }
-aside { top: 72px; height: calc(100dvh - 72px); padding: 24px 20px; }
+#sidebar { top: 72px; height: calc(100dvh - 72px); padding: 24px 20px; }
 .sidebar-caption { font-size: 12px; letter-spacing: 0; margin-bottom: 16px; }
 .side-nav { gap: 4px; }
 .nav-item { font-size: 15px; padding: 10px 12px; gap: 12px; color: var(--muted); }
@@ -41,7 +30,7 @@ aside { top: 72px; height: calc(100dvh - 72px); padding: 24px 20px; }
 .sidebar-divider { margin: 20px 0; }
 .list-heading h2 { font-size: 16px; margin: 0 0 12px; }
 .list-heading h3 { font-size: 14px; }
-aside input, aside select { font-size: 16px; }
+#sidebar input, #sidebar select { font-size: 16px; }
 .create-course { margin: 8px 0; }
 summary { font-size: 14px; min-height: 44px; }
 .create-course summary { padding: 10px 0; }
@@ -195,7 +184,7 @@ footer { margin-top: 40px; font-size: 13px; }
   .account-menu > summary { max-width: 92px; padding: 8px; }
   #account-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .app-shell { display: block; }
-  aside { top: 64px; height: calc(100dvh - 64px); }
+  #sidebar { top: 64px; height: calc(100dvh - 64px); }
   .sidebar-overlay { inset: 64px 0 0; }
   .workspace { padding: 24px 16px; }
   .workspace-topline { font-size: 12px; margin-bottom: 20px; }
@@ -237,8 +226,8 @@ footer { margin-top: 40px; font-size: 13px; }
 }
 
 /* Subtle depth and short, purposeful interaction feedback. */
-:root { --shadow: 0 8px 28px #1f443b08; --header-surface: #ffffffed; }
-:root[data-theme=dark] { --header-surface: #1b2621ed; }
+
+
 body { background-image: radial-gradient(ellipse at 82% 5%,color-mix(in srgb,var(--soft) 75%,transparent),transparent 45%); }
 .app-header { background: var(--header-surface); backdrop-filter: blur(12px); }
 .brand-mark { box-shadow: 0 4px 12px color-mix(in srgb,var(--green) 12%,transparent); }

@@ -3,13 +3,11 @@
 import base64
 import logging
 import re
-from io import BytesIO
 
-import pypdfium2 as pdfium
 from sqlalchemy import select
 
 from app.models import Document
-from app.rag.parsers.ocr import pdfium_lock
+from app.services.pdf_preview import render_pdf_page
 
 logger = logging.getLogger("studyagent")
 
@@ -51,30 +49,10 @@ class PDFVisuals:
         for document_id, number in candidates[:limit]:
             path, name, document_type = documents[document_id]
             try:
-                with pdfium_lock:
-                    reader = pdfium.PdfDocument(path)
-                    try:
-                        if not 1 <= number <= len(reader):
-                            raise ValueError("page outside document")
-                        page = reader[number - 1]
-                        try:
-                            width, height = page.get_size()
-                            scale = min(2.5, self.settings.pdf_visual_max_edge / max(width, height))
-                            bitmap = page.render(scale=scale)
-                            try:
-                                picture = bitmap.to_pil().convert("RGB")
-                                try:
-                                    stream = BytesIO()
-                                    picture.save(stream, format="JPEG", quality=90)
-                                    encoded = base64.b64encode(stream.getvalue()).decode("ascii")
-                                finally:
-                                    picture.close()
-                            finally:
-                                bitmap.close()
-                        finally:
-                            page.close()
-                    finally:
-                        reader.close()
+                picture, _ = render_pdf_page(
+                    path, number, max_edge=self.settings.pdf_visual_max_edge,
+                )
+                encoded = base64.b64encode(picture).decode("ascii")
                 references = [source.citation_id for source in sources if (
                     source.document_id == document_id and source.page == number
                     and source.document_type != "exam"

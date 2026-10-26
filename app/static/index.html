@@ -5,15 +5,12 @@
   <meta name="theme-color" content="#141b2e"><meta name="description" content="有来源的学习 Agent，连接你的资料、练习与复习计划。">
   <title>StudyAgent · 让知识，连成线。</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%234e55dc'/%3E%3Cpath d='m20 7 11 7v12l-11 7-11-7V14Zm0 0v26M9 14l22 12M31 14 9 26' fill='none' stroke='white' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/minimal.css?v=20261013-integrated">
-  <link rel="stylesheet" href="/static/workspace.css?v=20261013-studio">
-  <script src="/static/app.js?v=20261021-local-word" defer></script>
-  <script src="/static/auth.js?v=20261013-fast" defer></script>
-  <script src="/static/connection.js?v=20261019-adaptive" defer></script>
-  <script src="/static/workspace.js?v=20261013-studio" defer></script>
-  <link rel="stylesheet" href="/static/professional.css?v=20261021-local-word">
-  <script src="/static/professional.js?v=20261019-adaptive" defer></script>
+  <link rel="stylesheet" href="/static/app.css?v=2040e4ad671a">
+  <script src="/static/app.js?v=6cfd35f125a7" defer></script>
+  <script src="/static/auth.js?v=d6096e1d844d" defer></script>
+  <script src="/static/connection.js?v=194f2d241195" defer></script>
+  <script src="/static/workspace.js?v=6eb3ad49fd91" defer></script>
+  <script src="/static/professional.js?v=af3ac21671d5" defer></script>
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('study-theme')||'light';document.documentElement.dataset.palette=localStorage.getItem('study-palette')||'aurora'}catch{}</script>
 </head>
 <body data-auth="guest">
@@ -92,11 +89,17 @@
       <div class="workspace-topline"><span>我的学习空间 <span class="breadcrumb-sep">/</span> <strong id="view-label">学习工作台</strong></span><span id="today-label"></span></div>
       <div id="status" role="status" aria-live="polite"></div>
       <section id="view-study" class="view-panel" data-panel="study">
+        <div class="desk-grid"><div class="desk-main">
         <div class="hero studio-hero"><div class="hero-copy"><span class="workspace-kicker"><span class="tiny-dot"></span> YOUR PERSONAL LEARNING WORKSPACE</span><h1>从资料，<em>到真正理解。</em></h1><p class="intro">提出问题，追溯依据，把每次理解积累下来。</p><button id="hero-focus" class="hero-link" type="button">从一个问题开始 <svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button></div>
           <div class="knowledge-scene" id="knowledge-scene"><div class="scene-grid" aria-hidden="true"></div><div class="scene-halo" aria-hidden="true"></div><div class="scene-system" aria-hidden="true"><div class="scene-orbit orbit-a"></div><div class="scene-orbit orbit-b"></div><div class="scene-core"><svg class="icon"><use href="#i-spark"/></svg></div><div class="scene-document scene-source"><svg class="icon"><use href="#i-book"/></svg><span>你的资料<small>KNOWLEDGE SOURCE</small></span></div><div class="scene-document scene-practice"><svg class="icon"><use href="#i-check"/></svg><span>每一次理解<small>CONNECTED INSIGHTS</small></span></div><span class="scene-particle particle-a"></span><span class="scene-particle particle-b"></span></div><div class="scene-caption"><span><span class="scene-dot"></span> 知识，正在连接</span><button id="scene-motion" type="button" class="scene-motion" aria-label="暂停知识连接动效" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><path id="scene-motion-icon" d="M7 5v10M13 5v10"/></svg></button></div></div>
         </div>
 
-        <div class="section-heading"><div><div class="eyebrow">ASK & EXPLORE</div><h2>把好奇心，交给你的学习助手</h2></div><span class="section-number">01 —</span></div>
+        <div id="study-pulse" class="study-pulse account-only" hidden aria-label="真实学习进度">
+          <button id="pulse-week" type="button" class="link-button" title="查看近七天练习">近七天 <strong>—</strong> 次练习</button>
+          <button id="pulse-accuracy" type="button" class="link-button">自评正确率 <strong>—</strong></button>
+          <button id="pulse-wrong" type="button" class="link-button">待复习 <strong>—</strong></button>
+          <svg id="pulse-chart" viewBox="0 0 112 30" role="img" aria-label="选择课程后显示近七天练习趋势"></svg>
+        </div>
         <div class="workspace-context"><button id="workspace-library" type="button" aria-label="连接学习资料"><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg></button><div class="workspace-context-copy"><strong id="workspace-course">连接你的学习资料</strong><p id="workspace-scope">登录后，课程、对话与练习保存在同一空间</p></div><span class="memory-label"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span id="workspace-memory">专属学习空间</span></span></div>
         <div id="mode-note" class="notice account-only" hidden>正在读取服务模式…</div>
         <div class="session-bar account-only" hidden><span id="session-count" class="hint">新对话 · 可以连续追问</span><button id="new-session" type="button" class="link-button">＋ 新对话</button></div>
@@ -113,8 +116,13 @@
           <p class="hint">在上方对话中总结知识点、整理易错点或出题；需要指定题型与数量时，可展开设置。</p>
           <details id="generation-settings" class="generation-settings"><summary>设置生成内容、题型与数量</summary><form id="generation-form" class="question-card"><div class="generation-grid"><div><label for="generation-kind">生成内容</label><select id="generation-kind"><option value="review">复习提纲 · 重点与易错点</option><option value="mock_exam">模拟练习卷 · 参考解析</option></select></div><div><label for="generation-topics">知识主题 · 最多 8 个</label><input id="generation-topics" maxlength="960" placeholder="例如：A*，BFS，DFS" required></div></div><div id="exam-options" class="generation-grid" hidden><div><label for="generation-count">题目数量 · 1–12</label><input id="generation-count" type="number" min="1" max="12" value="3" required></div><div><label for="generation-type">题型</label><select id="generation-type"><option value="short_answer">简答题</option><option value="choice">选择题</option><option value="calculation">计算题</option></select></div><div><label for="generation-difficulty">目标难度</label><select id="generation-difficulty"><option value="easy">基础</option><option value="medium" selected>适中</option><option value="hard">进阶</option></select></div></div><p class="hint">沿用左侧资料范围。用逗号分隔主题，每个主题都需要可检索的教材、课件或笔记。</p><div class="question-actions"><span class="hint">生成后自动保存，可预览、练习与下载</span><button id="generate-button" type="submit">生成并保存 ↗</button></div></form></details>
           <p id="generation-status" role="status" aria-live="polite" class="hint"></p><section id="artifact-preview" hidden><h2 id="artifact-title"></h2><p id="artifact-warning" class="warning"></p><div id="artifact-downloads" class="artifact-actions"></div><div id="artifact-content"></div><details><summary>查看生成依据与原文快照</summary><div id="artifact-sources" class="sources"></div></details></section>
-          <details id="generation-history" class="generation-history"><summary>已保存的复习资料与练习</summary><div id="artifact-history"><p class="empty">选择课程后查看生成记录。</p></div><button id="more-artifacts" type="button" class="link-button" hidden>加载更多</button></details>
+          <details id="generation-history" class="generation-history" open><summary>最近生成 · 复习资料与练习</summary><div id="artifact-history"><p class="empty">选择课程后查看生成记录。</p></div><button id="more-artifacts" type="button" class="link-button" hidden>加载更多</button></details>
         </section>
+        </div><aside id="study-context" class="study-context account-only" hidden aria-label="学习上下文">
+          <section><div class="list-heading"><h2>复习安排</h2><button id="desk-plans" type="button" class="link-button">查看计划</button></div><p id="desk-plan-summary" class="hint">选择课程后，查看复习进度。</p><div id="desk-weak-topics"></div></section>
+          <section><div class="list-heading"><h2>继续上次</h2><button id="desk-history" type="button" class="link-button">全部记录</button></div><div id="desk-recent"><p class="hint">选择课程后，接着上次的问题。</p></div></section>
+          <p class="context-footnote">每一条引用，都能回到原文。</p>
+        </aside></div>
       </section>
       <section id="view-exams" class="view-panel exam-panel" data-panel="exams" hidden><div class="page-heading"><div class="eyebrow">PRACTICE & REFLECT / 02</div><h1>历史题库</h1><p class="intro">连接历史考题与知识点，对照原文分析，留下每次练习的反馈。</p></div><div class="list-heading"><h2>历史题库</h2><button id="refresh-papers" class="link-button" type="button">刷新题库 ↻</button></div><p class="hint">以「试卷」类别上传会自动提取题目；知识点与难度请对照原卷核查。</p><div id="papers"></div><form id="question-search-form" class="search-card"><label class="sr-only" for="paper-filter">试卷</label><select id="paper-filter"><option value="">全部已解析试卷</option></select><label class="sr-only" for="question-keyword">知识点关键词</label><input id="question-keyword" placeholder="搜索知识点，如 A*" maxlength="120"><button type="submit">查题 ↗</button></form><div id="question-list"><p class="empty">选择试卷或输入知识点，开始一次练习。</p></div></section>
       <section id="view-learning" class="view-panel" data-panel="learning" hidden><span id="wrong-nav-count" hidden></span><div class="page-heading"><div class="eyebrow">YOUR OWN PACE / 03</div><h1>错题与计划</h1><p class="intro">用真实练习记录薄弱点，让复习安排更贴近自己。</p></div><div class="learning-overview"><article class="surface-card"><div class="list-heading"><h2>近 7 天练习</h2><span class="hint">按上海时间统计</span></div><div id="activity-chart" class="activity-chart" role="img" aria-label="近七天练习次数"></div><p id="accuracy-note" class="hint">正确率来自练习自评，尚未自动评分。</p></article><article class="surface-card"><div class="list-heading"><h2>值得再看一遍</h2><button id="weakness-review" class="link-button" type="button">生成复习提纲 ↗</button></div><div id="weak-topics"><p class="empty">记录练习后，薄弱知识点会出现在这里。</p></div></article></div><div class="section-heading"><h2>我的错题本 <span id="wrong-count" class="count-pill">0</span></h2><label class="check-label"><input id="include-mastered" type="checkbox"> 包含已掌握</label></div><div id="wrongbook"><p class="empty">还没有错题记录。从题库或模拟卷开始练习。</p></div><button id="more-wrongs" class="link-button" type="button" hidden>加载更多错题</button><div class="section-heading"><div><div class="eyebrow">MAKE A LITTLE PROGRESS, EVERY DAY</div><h2>安排你的复习节奏</h2></div></div><form id="plan-form" class="question-card"><div class="generation-grid"><div><label for="plan-topics">复习主题 · 可留空</label><input id="plan-topics" placeholder="优先采用你的薄弱知识点" maxlength="960"></div><div><label for="plan-days">复习天数 · 1–30</label><input id="plan-days" type="number" min="1" max="30" value="7" required></div><div><label for="plan-minutes">每天分钟数 · 10–180</label><input id="plan-minutes" type="number" min="10" max="180" value="30" required></div></div><div class="question-actions"><span class="hint">按资料与错题安排阅读、回忆、练习和复盘</span><button id="plan-button" type="submit">创建复习计划 ↗</button></div></form><div id="plans"></div><button id="more-plans" class="link-button" type="button" hidden>加载更多计划</button></section>
@@ -125,6 +133,10 @@
   <template id="history-empty-template"><article class="history-empty empty"><div class="empty-illustration" aria-hidden="true"><div class="empty-sheet sheet-back"></div><div class="empty-sheet sheet-front"><svg class="icon"><use href="#i-spark"/></svg><span></span><span></span><span></span></div><span class="empty-spark">+</span></div><span class="empty-caption">A SPACE FOR YOUR NEXT IDEA</span><h3>你的下一次灵感，从这里开始</h3><p>对话会带着回答与原文依据，保存在你的学习空间。</p><button class="secondary" type="button">开始一个新问题 <svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button></article></template>
   <dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title"><form method="dialog" class="command-heading"><h2 id="command-title">想从哪里开始？</h2><button class="icon-button" aria-label="关闭快捷操作">×</button></form><label class="sr-only" for="command-search">搜索快捷操作</label><input id="command-search" placeholder="搜索页面或学习任务…" autocomplete="off"><div id="command-results"></div><p class="hint">方向键选择 · Enter 打开 · Esc 关闭</p></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="source-drawer" class="source-drawer" aria-labelledby="source-drawer-title">
+    <form method="dialog" class="drawer-heading"><h2 id="source-drawer-title">来源预览</h2><button type="submit" class="icon-button" aria-label="关闭来源预览">×</button></form>
+    <div id="source-preview"></div>
+  </dialog>
   <dialog id="relation-dialog" class="connection-dialog relation-dialog" aria-labelledby="relation-title" aria-describedby="relation-description">
     <form method="dialog" class="command-heading"><h2 id="relation-title">知识与试题的联系</h2><button class="icon-button" aria-label="关闭学习关联">×</button></form>
     <p id="relation-description" class="hint"></p><div id="relation-content" aria-live="polite"></div>

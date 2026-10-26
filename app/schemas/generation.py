@@ -100,6 +100,10 @@ class ArtifactSummary(BaseModel):
     mode: str
     created_at: str
     warning: str
+    section_count: int = 0
+    question_count: int = 0
+    topic_count: int = 0
+    source_count: int = 0
 
 
 class ArtifactOut(ArtifactSummary):

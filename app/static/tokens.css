@@ -1,0 +1,68 @@
+/* The only theme token definitions. Legacy names remain aliases during migration. */
+:root {
+  font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 16px;
+  color-scheme: light;
+  color: var(--ink);
+  background: var(--bg);
+  --bg: #f5f6fa;
+  --surface: #fff;
+  --sunken: #eef1f7;
+  --ink: #141a2a;
+  --ink-2: #475069;
+  --muted: #626d83;
+  --line: #e2e6ef;
+  --accent: #4c56d6;
+  --accent-strong: #3b45c4;
+  --accent-weak: #eef0ff;
+  --cite: #946022;
+  --cite-weak: #fbf1e3;
+  --ok: #1f7a5a;
+  --warn: #a15c0b;
+  --danger: #b3314d;
+  --rail: #121829;
+  --rail-2: #1b2438;
+  --rail-ink: #f0f3ff;
+  --rail-muted: #aeb8d2;
+  --on-primary: #fff;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --text-body: 14px;
+  --text-meta: 12px;
+  --text-reading: 16px;
+  --shadow-overlay: 0 18px 50px #10182b1f;
+  --soft: var(--accent-weak);
+  --border: var(--line);
+  --green: var(--accent);
+  --green-deep: var(--accent-strong);
+  --gold: var(--cite);
+  --destructive: var(--danger);
+  --header-surface: var(--surface);
+  --primary-fill: var(--accent);
+  --scene-wash: var(--accent-weak);
+  --scene-glow: var(--line);
+  --shadow: none;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1320;
+  --surface: #171c2b;
+  --sunken: #1f2637;
+  --ink: #eef1fa;
+  --ink-2: #c3cad9;
+  --muted: #9aa4ba;
+  --line: #2a3145;
+  --accent: #a7b1ff;
+  --accent-strong: #c0c8ff;
+  --accent-weak: #232a4a;
+  --cite: #e0b477;
+  --cite-weak: #2e271d;
+  --ok: #7fd3b2;
+  --warn: #f0c27a;
+  --danger: #ffb3c1;
+  --rail: #0b0f1b;
+  --rail-2: #141a2b;
+  --on-primary: #141a2a;
+}

@@ -1,0 +1,8 @@
+/* Explicit cascade: themes have one owner; screen rules have one final layer. */
+@layer tokens, base, controls, layout, reader, desk;
+@import url("tokens.css?v=6744da7f0d7b") layer(tokens);
+@import url("style.css?v=e2c7fdda7c4e") layer(base);
+@import url("minimal.css?v=46469e1e9f91") layer(controls);
+@import url("workspace.css?v=ceabf9f2b0a4") layer(layout);
+@import url("professional.css?v=37e11f1f8334") layer(reader);
+@import url("desk.css?v=34fea31a4de9") layer(desk);

@@ -242,6 +242,8 @@ class GenerationService:
 
     @staticmethod
     def _summary(row):
+        content = row.payload.get("content", {})
+        sections, questions = content.get("sections", []), content.get("questions", [])
         return ArtifactSummary(
             id=row.id,
             course_id=row.course_id,
@@ -250,6 +252,10 @@ class GenerationService:
             mode=row.mode,
             created_at=row.created_at,
             warning=row.warning,
+            section_count=len(sections),
+            question_count=len(questions),
+            topic_count=len({item["topic"] for item in sections + questions if item.get("topic")}),
+            source_count=len(row.payload.get("sources", [])),
         )
 
     @classmethod
