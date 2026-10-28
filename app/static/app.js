@@ -90,6 +90,10 @@ async function api(path, options = {}) {
 function post(path, data, options = {}) {
   return api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data), ...options });
 }
+// Warm the public health probe while auth.js checks the session in parallel, so
+// the first screen does not wait for health + connection + courses in series.
+const bootHealth = api("/health");
+bootHealth.catch(() => {});
 function element(tag, text, className) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -418,13 +422,18 @@ $("question-search-form").addEventListener("submit", async event => {
   } catch (error) { status(error.message, true); }
 });
 async function start() {
+  // Connection state and the course list are independent of health; fetch them
+  // together and keep the course render one round trip shorter.
+  const connectionPromise = api("/api/connection").catch(() => null);
+  const coursesPromise = loadCourses();
+  coursesPromise.catch(() => {});
   try {
-    const health = await api("/health");
+    const [health, profile] = await Promise.all([bootHealth, connectionPromise]);
     maxUploadMb = health.max_upload_mb || 200;
     document.querySelector(".upload-hint").textContent = `${health.ocr_enabled ? "扫描 PDF 自动 OCR" : "文本型文件"} · 单文件上限 ${maxUploadMb} MB`;
     updateModelMode(health.mode);
-    try { const profile = await api("/api/connection"); updateModelMode(profile.mode, profile.model, profile.configured); } catch {}
-    await loadCourses();
+    if (profile) updateModelMode(profile.mode, profile.model, profile.configured);
+    await coursesPromise;
   } catch (error) { status(error.message, true); }
 }
 

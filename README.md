@@ -253,4 +253,4 @@ Phase 1 / 2 / 3 / 4 代码已实现，离线单元 / 集成测试及真实浏览
 
 ## Render 部署与响应优化
 
-使用仓库中的 `.python-version`（Python 3.11），构建 `pip install .`，启动 `uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT`，保持一个 worker。空 Render 空间允许创建首个独立账号，HTTPS Cookie 自动启用。部署失败原因、性能实测和免费实例的数据限制见 [响应优化与 Render 部署](docs/performance-and-render.md)。
+使用仓库中的 `.python-version`（Python 3.11），构建 `pip install .`，启动 `uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT`，保持一个 worker。空 Render 空间允许创建首个独立账号，HTTPS Cookie 自动启用。页面使用单 CSS 请求、gzip、内容哈希长缓存，仓库自带每 5 分钟一次的 keep-warm 工作流；优化细节见 [轻量化与启动优化](docs/lightweight-startup.md)，部署失败原因、性能实测和免费实例的数据限制见 [响应优化与 Render 部署](docs/performance-and-render.md)。

@@ -1,0 +1,32 @@
+name: Keep StudyAgent warm
+
+# Render's free Web Service sleeps after about 15 minutes without traffic, and
+# the next visit then waits roughly a minute for the container to boot. A
+# five-minute health probe keeps the instance warm around the clock without
+# changing any application behaviour or touching user data.
+#
+# GitHub may delay scheduled runs under load; treat this as best-effort. An
+# external uptime monitor pointed at /health is an equivalent alternative.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe /health
+        run: |
+          curl --fail --silent --show-error --max-time 120 \
+            https://studyagent-jlh3.onrender.com/health
+          echo

@@ -21,4 +21,5 @@ dist/
 /adaptive-model-ui.png
 /adaptive-slides-ui.png
 /.tmp-ui-desk/
+/.tmp-bench/
 /.taste-skill/

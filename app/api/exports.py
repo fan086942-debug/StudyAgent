@@ -4,7 +4,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from app.core.errors import AppError
-from app.services.word_export import artifact_word, conversation_word
 
 router = APIRouter(prefix="/api", tags=["Word export"])
 MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -20,6 +19,10 @@ def word_response(content, identifier, kind):
 @router.get("/courses/{course_id}/artifacts/{artifact_id}/word")
 def export_artifact(course_id: str, artifact_id: str, request: Request,
                     kind: Literal["qa", "knowledge"] = "qa"):
+    # python-docx is only needed when a download is requested; import lazily so
+    # it does not slow every cold process start.
+    from app.services.word_export import artifact_word
+
     artifact = request.state.services.generation.get(course_id, artifact_id)
     return word_response(artifact_word(artifact, kind), artifact_id, kind)
 
@@ -27,6 +30,8 @@ def export_artifact(course_id: str, artifact_id: str, request: Request,
 @router.get("/courses/{course_id}/conversations/{conversation_id}/word")
 def export_conversation(course_id: str, conversation_id: str, request: Request,
                         kind: Literal["qa", "knowledge"] = "qa"):
+    from app.services.word_export import artifact_word, conversation_word
+
     services = request.state.services
     record = services.learning.conversation(course_id, conversation_id)
     if record["result"].get("insufficient_evidence", False):

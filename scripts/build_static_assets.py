@@ -1,33 +1,37 @@
-"""Stamp local assets with content hashes; no bundler or remote dependencies."""
+"""Refresh content hashes for local static assets; no bundler or remote deps.
 
-import hashlib
-import re
+The CSS entry (``app.bundle.css``) is generated in memory from the six source
+modules at request time, so there is no second stylesheet copy to keep in sync.
+Run this after editing CSS or JS so index.html points at fresh URLs:
+
+    .venv/Scripts/python.exe scripts/build_static_assets.py
+"""
+
+import sys
 from pathlib import Path
 
-STATIC = Path(__file__).resolve().parents[1] / "app" / "static"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-
-def version(name):
-    return hashlib.sha256((STATIC / name).read_bytes()).hexdigest()[:12]
+from app.core.static_bundle import (  # noqa: E402
+    BUNDLE_NAME,
+    STATIC,
+    bundle_text,
+    bundle_version,
+    stamp,
+)
 
 
 def build():
-    sheet = STATIC / "app.css"
-    css = sheet.read_text(encoding="utf-8")
-    css = re.sub(
-        r'url\("([\w-]+\.css)(?:\?v=[^"\)]*)?"\)',
-        lambda match: f'url("{match[1]}?v={version(match[1])}")', css,
-    )
-    sheet.write_text(css, encoding="utf-8", newline="\n")
-    page = STATIC / "index.html"
-    html = re.sub(
-        r'((?:src|href)="/static/)([\w.-]+\.(?:js|css))(?:\?v=[^"]*)?(")',
-        lambda match: f"{match[1]}{match[2]}?v={version(match[2])}{match[3]}",
-        page.read_text(encoding="utf-8"),
-    )
-    page.write_text(html, encoding="utf-8", newline="\n")
+    stamp()
+    return {
+        "bundle": BUNDLE_NAME,
+        "version": bundle_version(),
+        "bytes": len(bundle_text().encode("utf-8")),
+        "sources": STATIC,
+    }
 
 
 if __name__ == "__main__":
-    build()
+    result = build()
+    print(f"CSS bundle: {result['bundle']} v={result['version']} ({result['bytes']} bytes)")
     print("Static asset content hashes updated.")

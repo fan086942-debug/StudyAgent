@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.core.config import Settings
+from app.core.static_bundle import BUNDLE_NAME, bundle_text, bundle_version
 from app.main import create_app
 
 
@@ -13,6 +14,39 @@ def test_health(tmp_path):
         assert response.headers["x-request-id"]
         assert client.get("/").status_code == 200
         assert client.get("/static/app.js").status_code == 200
+
+
+def test_single_css_bundle_is_cacheable_and_complete(tmp_path):
+    with TestClient(create_app(Settings(_env_file=None, data_dir=tmp_path))) as client:
+        page = client.get("/")
+        assert page.headers["cache-control"] == "no-cache"
+        assert f"/static/{BUNDLE_NAME}?v={bundle_version()}" in page.text
+        assert "/static/app.css" not in page.text
+
+        url = f"/static/{BUNDLE_NAME}?v={bundle_version()}"
+        response = client.get(url, headers={"Accept-Encoding": "gzip"})
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/css")
+        assert "immutable" in response.headers["cache-control"]
+        assert response.headers["content-encoding"] == "gzip"
+        assert response.headers["etag"] == f'"{bundle_version()}"'
+        assert client.get(url, headers={"If-None-Match": response.headers["etag"]}).status_code == 304
+        # An unversioned URL may be requested directly, so it must revalidate.
+        assert client.get(f"/static/{BUNDLE_NAME}").headers["cache-control"] == "no-cache"
+
+        css = bundle_text()
+        assert "@import" not in css and "@charset" not in css
+        assert css.startswith("@layer tokens, base, controls, layout, reader, desk;")
+        assert css.count("@layer ") == 7
+
+
+def test_versioned_js_gets_long_lived_cache(tmp_path):
+    with TestClient(create_app(Settings(_env_file=None, data_dir=tmp_path))) as client:
+        versioned = client.get("/static/app.js?v=test")
+        assert versioned.status_code == 200
+        assert "immutable" in versioned.headers["cache-control"]
+        unversioned = client.get("/static/app.js")
+        assert unversioned.headers["cache-control"] == "public, max-age=3600"
 
 
 def test_invalid_config():

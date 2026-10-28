@@ -3,8 +3,6 @@
 import hashlib
 from io import BytesIO
 
-import pypdfium2 as pdfium
-
 from app.rag.parsers.ocr import pdfium_lock
 
 
@@ -16,6 +14,10 @@ def delete_preview_cache(data_dir, document_id):
 
 
 def render_pdf_page(path, number, *, width=None, max_edge=2400):
+    # Imported on first use: PDFium's native bindings are a measurable part of
+    # cold process start, but only page previews and OCR need them.
+    import pypdfium2 as pdfium
+
     with pdfium_lock:
         reader = pdfium.PdfDocument(path)
         try:

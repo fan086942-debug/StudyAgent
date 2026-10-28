@@ -7,10 +7,16 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+try:  # Starlette >= 1.x exposes the default exclusions; older releases do not.
+    from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES
+except ImportError:  # pragma: no cover - compatibility with older pins
+    DEFAULT_EXCLUDED_CONTENT_TYPES = None
 
 from app.api.agent import router as agent_router
 from app.api.auth import router as auth_router
@@ -26,10 +32,38 @@ from app.api.material_learning import router as material_learning_router
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.core.http import LazyHTTPClient
+from app.core.static_bundle import BUNDLE_NAME, bundle_text, bundle_version
 from app.services.auth import COOKIE, AuthService
 from app.services.workspaces import Workspaces, initialize_workspace
 
 logger = logging.getLogger("studyagent")
+
+# Already-compressed downloads gain nothing from gzip and would cost CPU on
+# large PDFs; text/event-stream is excluded by Starlette itself.
+GZIP_EXCLUDED = (
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+)
+
+
+class VersionedStaticFiles(StaticFiles):
+    """Long-lived browser cache for content-hashed static URLs.
+
+    index.html references every asset with ``?v=<content hash>``. Those URLs can
+    never change content, so repeat visits load them from disk instead of
+    revalidating each file over the network. Unversioned URLs stay short-lived.
+    """
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            versioned = b"v=" in scope.get("query_string", b"")
+            response.headers["Cache-Control"] = (
+                "public, max-age=31536000, immutable"
+                if versioned
+                else "public, max-age=3600"
+            )
+        return response
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -75,11 +109,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(material_learning_router)
     app.include_router(connection_router)
     static = Path(__file__).parent / "static"
-    app.mount("/static", StaticFiles(directory=static), name="static")
+    version = bundle_version()
+
+    @app.get(f"/static/{BUNDLE_NAME}", include_in_schema=False)
+    def css_bundle(request: Request):
+        # One render-blocking request instead of seven @import hops. The source
+        # modules stay separate; the in-memory bundle cannot drift from them.
+        etag = f'"{version}"'
+        headers = {"ETag": etag}
+        if request.query_params.get("v") == version:
+            headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            headers["Cache-Control"] = "no-cache"
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers=headers)
+        return Response(bundle_text(), media_type="text/css", headers=headers)
+
+    app.mount("/static", VersionedStaticFiles(directory=static), name="static")
 
     @app.get("/", include_in_schema=False)
     def home():
-        return FileResponse(static / "index.html")
+        # The shell must be revalidated so a new deploy is picked up immediately;
+        # its hashed asset URLs make the rest of the page cacheable forever.
+        return FileResponse(static / "index.html", headers={"Cache-Control": "no-cache"})
 
     @app.middleware("http")
     async def request_log(request: Request, call_next):
@@ -188,6 +240,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "startup_ms": app.state.startup_ms,
         }
 
+    # Compress JSON and static text for clients that ask for it. Render's edge may
+    # already compress brotli; the origin gzip keeps local `uvicorn` runs small too.
+    gzip_options = {"minimum_size": 1024, "compresslevel": 6}
+    if DEFAULT_EXCLUDED_CONTENT_TYPES is not None:
+        gzip_options["exclude_content_types"] = DEFAULT_EXCLUDED_CONTENT_TYPES + GZIP_EXCLUDED
+    app.add_middleware(GZipMiddleware, **gzip_options)
     if os.environ.get("RENDER") == "true":
         # Render terminates HTTPS at its ingress; normalize scheme before origin validation.
         app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
