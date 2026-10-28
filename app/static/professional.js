@@ -196,8 +196,7 @@
   $('workspace-library').addEventListener('click',()=>{
     if (!window.studyAuth?.require('登录后，连接你的学习资料。')) return;
     if (innerWidth<=700) { if(!document.body.classList.contains('sidebar-open')) $('sidebar-toggle').click(); }
-    else if (document.body.classList.contains('rail-collapsed')) $('desktop-sidebar-toggle').click();
-    if (innerWidth > 700 && innerWidth < 980) document.body.classList.add('library-expanded');
+    else window.studyRail?.expand();
     $('course').focus({preventScroll:true});$('course').scrollIntoView({block:'nearest',behavior:motion()});
   });
   context();

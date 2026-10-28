@@ -21,8 +21,11 @@
   new ResizeObserver(queueNav).observe(nav);
   positionNav();
   const railToggle = $("desktop-sidebar-toggle");
-  let collapsed = false;
-  try { collapsed = localStorage.getItem("study-rail-collapsed") === "true"; } catch {}
+  let collapsed = matchMedia("(min-width: 701px) and (max-width: 979px)").matches;
+  try {
+    const saved = localStorage.getItem("study-rail-collapsed");
+    if (saved !== null) collapsed = saved === "true";
+  } catch {}
   function synchronizeRail() {
     document.body.classList.toggle("rail-collapsed", collapsed);
     railToggle.setAttribute("aria-expanded", String(!collapsed));
@@ -31,7 +34,13 @@
     queueNav();
   }
   nav.querySelectorAll(".nav-item").forEach(button => { button.setAttribute("aria-label", button.querySelector("span").textContent); button.title = button.getAttribute("aria-label"); });
-  railToggle.addEventListener("click", () => { collapsed = !collapsed; try { localStorage.setItem("study-rail-collapsed", String(collapsed)); } catch {} synchronizeRail(); });
+  function setRailCollapsed(value) {
+    collapsed = value;
+    try { localStorage.setItem("study-rail-collapsed", String(collapsed)); } catch {}
+    synchronizeRail();
+  }
+  railToggle.addEventListener("click", () => setRailCollapsed(!collapsed));
+  window.studyRail = {expand: () => setRailCollapsed(false)};
   synchronizeRail();
 
 
