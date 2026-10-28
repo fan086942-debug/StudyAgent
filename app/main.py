@@ -56,7 +56,7 @@ class VersionedStaticFiles(StaticFiles):
 
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
-        if response.status_code == 200:
+        if response.status_code in {200, 304}:
             versioned = b"v=" in scope.get("query_string", b"")
             response.headers["Cache-Control"] = (
                 "public, max-age=31536000, immutable"

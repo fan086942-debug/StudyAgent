@@ -30,7 +30,7 @@ gzip 后首页 + CSS + 5 个 JS 合计约 66 KB。云端实际耗时受出口网
 
 ## Render 免费实例不休眠
 
-新增 `.github/workflows/keep-warm.yml`，每 5 分钟访问一次 `/health`。Render 免费实例约 15 分钟无流量休眠；持续探测可避免用户打开页面时等待容器启动。该工作流需要位于默认分支，且 Render 服务的 Auto-Deploy 保持开启才会随代码更新。GitHub 定时任务可能延迟，属于尽力而为；也可用 UptimeRobot 等外部监控指向 `/health` 作为等价方案。
+新增 `.github/workflows/keep-warm.yml`，每 5 分钟访问一次 `/health`，并在 `main` 分支推送后立即执行一次。Render 免费实例约 15 分钟无流量休眠；持续探测可避免用户打开页面时等待容器启动。该工作流需要位于默认分支，且 Render 服务的 Auto-Deploy 保持开启才会随代码更新。GitHub 定时任务可能延迟，属于尽力而为；也可用 UptimeRobot 等外部监控指向 `/health` 作为等价方案。
 
 免费实例 750 小时/月：31 天持续唤醒约 744 小时，仍在额度内；若同时有其他常驻服务，需要核算总额度。keep-warm 不改变账号、资料或模型行为，也不会让免费实例的磁盘变为持久化。
 
